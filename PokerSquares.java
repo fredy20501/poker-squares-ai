@@ -237,6 +237,9 @@ public class PokerSquares {
 		random.setSeed(seed);
 	}
 
+	public void setVerbose(boolean verbose) {
+		this.verbose = verbose;
+	}
 
 	/**
 	 * Demonstrate single/batch game play testing and tournament evaluation of PokerSquaresPlayers.
