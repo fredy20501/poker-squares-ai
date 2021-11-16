@@ -8,7 +8,8 @@ import java.io.PrintWriter;
 public class TestRunner {
 
     // Change these values to test a different player & log the results in a different file
-    private static final File logFile = new File("logs/RandomPlayer.log");
+    private static final File logDir = new File("logs");
+    private static final File logFile = new File(logDir.getName()+"/RandomPlayer.log");
     private static final PokerSquaresPlayer player = new RandomPlayer();
 
     public static void main(String[] args) {
@@ -29,6 +30,8 @@ public class TestRunner {
 
     // If log file doesn't exist, create it with initial values.
     private static void initLogFile() {
+        // Create logs directory if doesn't exist
+        if (!logDir.exists()) logDir.mkdir();
         // Check if file exists
         if (!logFile.isFile()) {
             // Create file with initial values
