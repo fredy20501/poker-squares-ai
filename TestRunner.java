@@ -8,17 +8,17 @@ import java.io.PrintWriter;
 public class TestRunner {
 
     // Change these values to test a different player & log the results in a different file
-    private static final File logFile = new File("logs/RandomMCPlayer_d2.log");
-    private static final PokerSquaresPlayer player = new RandomMCPlayer();
+    private static final File logFile = new File("logs/RandomPlayer.log");
+    private static final PokerSquaresPlayer player = new RandomPlayer();
 
     public static void main(String[] args) {
         // Poker square setup
-		PokerSquaresPointSystem.setSeed(0L);
-		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
-		PokerSquares ps = new PokerSquares(player, system);
+        PokerSquaresPointSystem.setSeed(0L);
+        PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
+        PokerSquares ps = new PokerSquares(player, system);
         ps.setVerbose(false);
 
-		initLogFile();
+        initLogFile();
 
         // Run simulations forever (until stopped manually)
         while (true) {
@@ -32,8 +32,8 @@ public class TestRunner {
         // Check if file exists
         if (!logFile.isFile()) {
             // Create file with initial values
-            String header = "Play# Score Cummulative_Mean Cummulative_StdDev S(n)";
-            String firstLine = "0 0 0 0 0";
+            String header = "Play# Score Min Max Cummulative_Mean Cummulative_StdDev S(n)";
+            String firstLine = "0 0 0 0 0 0 0";
             addLine(header);
             addLine(firstLine);
         }
@@ -44,25 +44,32 @@ public class TestRunner {
         // Get last values from log file
         String[] values = tail(logFile).split(" ");
         int numPlay = Integer.parseInt(values[0]) + 1;
-        double prevMean = Double.parseDouble(values[2]);
-        double prevS = Double.parseDouble(values[4]);
+        int prevMin = Integer.parseInt(values[2]);
+        int prevMax = Integer.parseInt(values[3]);
+        double prevMean = Double.parseDouble(values[4]);
+        double prevS = Double.parseDouble(values[6]);
 
         // Calculate new values (formulas taken from: https://datagenetics.com/blog/november22017/index.html)
+        int newMin, newMax;
         double newMean, newS, newStdDev;
         if (numPlay == 0) {
             // Special case for first value
+            newMin = score;
+            newMax = score;
             newMean = score;
             newS = 0;
             newStdDev = 0;
         }
         else {
+            newMin = score < prevMin ? score : prevMin;
+            newMax = score > prevMax ? score : prevMax;
             newMean = prevMean + (score - prevMean)/numPlay;
             newS = prevS + (score - prevMean)*(score - newMean);
             newStdDev = Math.sqrt(newS/numPlay);
         }
 
         // Append new values to log file (and print to console)
-        String newLine = numPlay+" "+score+" "+newMean+" "+newStdDev+" "+newS;
+        String newLine = numPlay+" "+score+" "+newMin+" "+newMax+" "+newMean+" "+newStdDev+" "+newS;
         addLine(newLine);
     }
 
