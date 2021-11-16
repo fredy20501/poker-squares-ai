@@ -55,7 +55,7 @@ public class TestRunner {
         // Calculate new values (formulas taken from: https://datagenetics.com/blog/november22017/index.html)
         int newMin, newMax;
         double newMean, newS, newStdDev;
-        if (numPlay == 0) {
+        if (numPlay == 1) {
             // Special case for first value
             newMin = score;
             newMax = score;
