@@ -94,7 +94,7 @@ public class Card {
 	 * @param rank Card rank. Should be in range [0, NUM_RANKS - 1].
 	 * @param suit Card suit. Should be in range [0, NUM_SUITS - 1].
 	 */
-	private Card(int rank, int suit) {
+	public Card(int rank, int suit) {
 		this.rank = rank;
 		this.suit = suit;
 	}
