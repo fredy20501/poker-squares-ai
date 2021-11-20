@@ -25,7 +25,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 											// From plays index [numPlays] onward, we maintain a list of yet unplayed positions.
 	private int numPlays = 0; // number of Cards played into the grid so far
 	private PokerSquaresPointSystem system; // point system
-	private int depthLimit = 2; // default depth limit for Monte Carlo (MC) play
+	private int depthLimit = 25; // default depth limit for Monte Carlo (MC) play
 	private Card[][] grid = new Card[SIZE][SIZE]; // grid with Card objects or null (for empty positions)
 	private Card[] simDeck = Card.getAllCards(); // a list of all Cards. As we learn the index of cards in the play deck,
 	                                             // we swap each dealt card to its correct index.  Thus, from index numPlays 
