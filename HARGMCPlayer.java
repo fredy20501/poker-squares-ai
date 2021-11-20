@@ -758,7 +758,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 		}
 	}
 
-	private static void train(int depth) {
+	public static void train(int depth) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
 		HARGMCPlayer player = new HARGMCPlayer(depth);
