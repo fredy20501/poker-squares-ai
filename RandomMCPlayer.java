@@ -3,23 +3,23 @@ import java.util.Random;
 
 /**
  * RandomMCPlayer - a simple Monte Carlo implementation of the player interface for PokerSquares.
- * For each possible play, continues play with random possible card draws and random card placements to a given depth limit 
+ * For each possible play, continues play with random possible card draws and random card placements to a given depth limit
  * (or game end).  Having sampled trajectories for all possible plays, the RandomMCPlayer then selects the
  * play yielding the best average scoring potential in such Monte Carlo simulation.
- * 
+ *
  * Disclaimer: This example code is not intended as a model of efficiency. (E.g., patterns from Knuth's Dancing Links
  * algorithm (DLX) can provide faster legal move list iteration/deletion/restoration.)  Rather, this example
  * code illustrates how a player could be constructed.  Note how time is simply managed so as to not run out the play clock.
- * 
+ *
  * Author: Todd W. Neller
  * Modifications by: Michael W. Fleming
  */
 public class RandomMCPlayer implements PokerSquaresPlayer {
-	
+
 	private final int SIZE = 5; // number of rows/columns in square grid
 	private final int NUM_POS = SIZE * SIZE; // number of positions in square grid
 	private final int NUM_CARDS = Card.NUM_CARDS; // number of cards in deck
-	private Random random = new Random(); // pseudorandom number generator for Monte Carlo simulation 
+	private Random random = new Random(); // pseudorandom number generator for Monte Carlo simulation
 	private int[] plays = new int[NUM_POS]; // positions of plays so far (index 0 through numPlays - 1) recorded as integers using row-major indices.
 	// row-major indices: play (r, c) is recorded as a single integer r * SIZE + c (See http://en.wikipedia.org/wiki/Row-major_order)
 	// From plays index [numPlays] onward, we maintain a list of yet unplayed positions.
@@ -28,7 +28,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	private int depthLimit = 2; // default depth limit for Random Monte Carlo (MC) play
 	private Card[][] grid = new Card[SIZE][SIZE]; // grid with Card objects or null (for empty positions)
 	private Card[] simDeck = Card.getAllCards(); // a list of all Cards. As we learn the index of cards in the play deck,
-	                                             // we swap each dealt card to its correct index.  Thus, from index numPlays 
+	                                             // we swap each dealt card to its correct index.  Thus, from index numPlays
 												 // onward, we maintain a list of undealt cards for MC simulation.
 	private int[][] legalPlayLists = new int[NUM_POS][NUM_POS]; // stores legal play lists indexed by numPlays (depth)
 	// (This avoids constant allocation/deallocation of such lists during the selections of MC simulations.)
@@ -38,7 +38,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	 */
 	public RandomMCPlayer() {
 	}
-	
+
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to a given depth limit.
 	 * @param depthLimit depth limit for random simulated play
@@ -46,12 +46,12 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	public RandomMCPlayer(int depthLimit) {
 		this.depthLimit = depthLimit;
 	}
-	
+
 	/* (non-Javadoc)
 	 * @see PokerSquaresPlayer#init()
 	 */
 	@Override
-	public void init() { 
+	public void init() {
 		// clear grid
 		for (int row = 0; row < SIZE; row++)
 			for (int col = 0; col < SIZE; col++)
@@ -75,11 +75,11 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		 *     partially-filled) grid is scored.
 		 *   For each play simulation, random undrawn cards are drawn in simulation and the player
 		 *     picks a play position randomly.
-		 *   After many such plays, the average score per simulated play is computed.  The play with the highest 
-		 *     average score is chosen (breaking ties randomly).   
+		 *   After many such plays, the average score per simulated play is computed.  The play with the highest
+		 *     average score is chosen (breaking ties randomly).
 		 */
-		
-		// match simDeck to actual play event; in this way, all indices forward from the card contain a list of 
+
+		// match simDeck to actual play event; in this way, all indices forward from the card contain a list of
 		//   undealt Cards in some permutation.
 		int cardIndex = numPlays;
 		while (!card.equals(simDeck[cardIndex]))
@@ -87,7 +87,60 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		simDeck[cardIndex] = simDeck[numPlays];
 		simDeck[numPlays] = card;
 
-		if (numPlays < 24) { // not the forced last play
+		// Ben Myles
+		// 2021-11-18
+		// Begin
+		if (20 < numPlays && numPlays < 24) { // Turn #22-24 will be calculated by expectimax. #25 is forced.
+			int remainingPlays = NUM_POS - numPlays;
+			float maxScore = 0;
+			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
+			ArrayList<Integer> bestPlays = new ArrayList<Integer>(); // all plays yielding the maximum average score
+
+			System.out.println("DEBUG EXPECTIMAX----------------------------");
+
+			// System.out.println("Legal play list:");
+			// for (int i=0; i<legalPlayLists.length; i++) {
+			// 	for (int j=0; j<legalPlayLists[i].length; j++) {
+			// 		if (legalPlayLists[i][j] != 0)
+			// 			System.out.printf("%d,%d ", legalPlayLists[i][j]/SIZE,legalPlayLists[i][j]%SIZE );
+			// 	}
+			// 	System.out.println();
+			// }
+
+			for (int i = 0; i < remainingPlays; i++) { // for each legal play position
+				// Try a play, simulate to the end of the game
+				int play = legalPlayLists[numPlays][i];
+				System.out.printf("\nTrying play: (%d, %d) = %s\n", play/SIZE, play%SIZE, card);
+				makePlay(card, play / SIZE, play % SIZE);  // play the card at the empty position
+				float expectedScore = expectiSimPlay();
+				System.out.printf("Expected score: %.1f\n", expectedScore);
+				// int expectedScore = system.getScore(grid);
+				// Use the expected score of the simulated play to rank the play
+				if (expectedScore >= maxScore) {
+					if (expectedScore > maxScore) {
+						bestPlays.clear();
+					}
+					bestPlays.add(play);
+					maxScore = expectedScore;
+				}
+				// system.printGrid(grid);
+				// System.out.println();
+				undoPlay();
+			}
+			System.out.println("END DEBUG EXPECTIMAX------------------------");
+			int bestPlay = bestPlays.get(random.nextInt(bestPlays.size())); // choose a best play (breaking ties randomly)
+			// update our list of plays, recording the chosen play in its sequential position; all onward from numPlays are empty positions
+			int bestPlayIndex = numPlays;
+			while (plays[bestPlayIndex] != bestPlay) {
+				bestPlayIndex++;
+			}
+			plays[bestPlayIndex] = plays[numPlays];
+			plays[numPlays] = bestPlay;
+		}
+		// TODO: Combine these play-types (MC vs expecti) using an else if statement. Not done here to avoid conflicts with other devs
+		// End
+
+		else if (numPlays < 21) { // not the last few plays. Leave 3 for expecti and 1 forced
 			// compute average time per move evaluation
 			int remainingPlays = NUM_POS - numPlays; // ignores triviality of last play to keep a conservative margin for game completion
 			long millisPerPlay = millisRemaining / remainingPlays; // dividing time evenly with future getPlay() calls
@@ -95,7 +148,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			// copy the play positions (row-major indices) that are empty
 			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
 			double maxAverageScore = Double.NEGATIVE_INFINITY; // maximum average score found for moves so far
-			ArrayList<Integer> bestPlays = new ArrayList<Integer>(); // all plays yielding the maximum average score 
+			ArrayList<Integer> bestPlays = new ArrayList<Integer>(); // all plays yielding the maximum average score
 			for (int i = 0; i < remainingPlays; i++) { // for each legal play position
 				int play = legalPlayLists[numPlays][i];
 				long startTime = System.currentTimeMillis();
@@ -128,12 +181,46 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		}
 
 		int[] playPos = {plays[numPlays] / SIZE, plays[numPlays] % SIZE}; // decode it into row and column
+		System.out.printf("Making play: (%d, %d) = %s\n", plays[numPlays] / SIZE, plays[numPlays] % SIZE, card);
 		makePlay(card, playPos[0], playPos[1]); // make the chosen play (not undoing this time)
 		return playPos; // return the chosen play
 	}
 
+	/*
+	 * From the chosen play, attempt every possible game-end, evaluating them to
+	 * determine the expected score of the chosen play
+	 * @return resulting grid score after playing until end of game
+	*/
+	private float expectiSimPlay() {
+		// Base case: Expected value of a completed game is the score of the game
+		if (numPlays == NUM_POS) {
+			return system.getScore(grid);
+		}
+
+		int remainingPlays = NUM_POS - numPlays;
+
+		// Loop over the remaining cards in the deck, adding up their expected values
+		int sum = 0;
+		for (int i=numPlays; i<NUM_CARDS; i++) {
+			Card card = simDeck[i];
+
+			// Loop over the legal plays
+			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
+			for (int j=0; j<remainingPlays; j++) {
+			//int j=0; // Example for final play of the game
+				int play = legalPlayLists[numPlays][j];
+				makePlay(card, play / SIZE, play % SIZE);
+				// System.out.printf("%s: %.1f\n", card, expectiSimPlay());
+				sum += expectiSimPlay()/remainingPlays; // Returns the expected value of this card being played. Divide by remaining plays to scale the returned value by the number of moves that it's testing
+				undoPlay();
+			}
+		}
+		// Calculate expected score by averaging the expected score of all the possible cards that could be pulled
+		return ((float)sum)/(NUM_CARDS-numPlays);
+	}
+
 	/**
-	 * From the chosen play, perform simulated Card draws and random placement (depthLimit) iterations forward 
+	 * From the chosen play, perform simulated Card draws and random placement (depthLimit) iterations forward
 	 * and return the resulting grid score.
 	 * @param depthLimit - how many simulated random plays to perform
 	 * @return resulting grid score after random MC simulation to given depthLimit
@@ -142,7 +229,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		if (depthLimit == 0) { // with zero depth limit, return current score
 			return system.getScore(grid);
 		}
-		else { // up to the non-zero depth limit or to game end, iteratively make the given number of random plays 
+		else { // up to the non-zero depth limit or to game end, iteratively make the given number of random plays
 			int score = Integer.MIN_VALUE;
 			int maxScore = Integer.MIN_VALUE;
 			int depth = Math.min(depthLimit, NUM_POS - numPlays); // compute real depth limit, taking into account game end
@@ -168,7 +255,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			return score;
 		}
 	}
-	
+
 	public void makePlay(Card card, int row, int col) {
 		// match simDeck to event
 		int cardIndex = numPlays;
@@ -176,7 +263,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			cardIndex++;
 		simDeck[cardIndex] = simDeck[numPlays];
 		simDeck[numPlays] = card;
-		
+
 		// update plays to reflect chosen play in sequence
 		grid[row][col] = card;
 		int play = row * SIZE + col;
@@ -185,7 +272,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			j++;
 		plays[j] = plays[numPlays];
 		plays[numPlays] = play;
-		
+
 		// increment the number of plays taken
 		numPlays++;
 	}
@@ -193,7 +280,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	public void undoPlay() { // undo the previous play
 		numPlays--;
 		int play = plays[numPlays];
-		grid[play / SIZE][play % SIZE] = null;	
+		grid[play / SIZE][play % SIZE] = null;
 	}
 
 	/* (non-Javadoc)
