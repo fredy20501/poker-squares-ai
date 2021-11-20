@@ -9,12 +9,11 @@ import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 
 /**
- * (Hand Abstraction Reinforcement Greedy Monte Carlo Player)
- * HARGMCPlayer - a Monte Carlo implementation of the player interface for PokerSquares using an 
- * optimized greedy search as a playout policy, hand abstractions for partial evaluation, 
- * and reinforcement learning to learn hand abstraction values.
+ * (Hand Abstraction Greedy Monte Carlo Player)
+ * HAGMCPlayer - a Monte Carlo implementation of the player interface for PokerSquares using an 
+ * optimized greedy search as a playout policy, and hand abstractions for partial evaluation.
  */
-public class HARGMCPlayer implements PokerSquaresPlayer {
+public class HAGMCPlayer implements PokerSquaresPlayer {
 	
 	private final int SIZE = 5; // number of rows/columns in square grid
 	private final int NUM_POS = SIZE * SIZE; // number of positions in square grid
@@ -36,7 +35,6 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	// New fields (different from RandomMCPlayer)
 	private HashMap<Integer,Float[]> abstractionUtilities; // Hashmap storing the average utility for hand abstractions.
 	private File utilityFile;
-	public float epsilon = 0.5f; // Initial probability of making a random move during Monte Carlo simulation
 	private int[][] trainingAbstractions = new int[SIZE * 2][SIZE-1]; // Stores the 4 partial hand abstractions that occur during the game 
 																	  // for each of the 10 rows/cols (only used if training)
 
@@ -45,13 +43,13 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to depth 2.
 	 */
-	public HARGMCPlayer() {}
+	public HAGMCPlayer() {}
 	
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to a given depth limit.
 	 * @param depthLimit depth limit for random simulated play
 	 */
-	public HARGMCPlayer(int depthLimit) {
+	public HAGMCPlayer(int depthLimit) {
 		this.depthLimit = depthLimit;
 	}
 	
@@ -257,12 +255,6 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 				// choose a best play (breaking ties randomly)
 				if (bestPlays.size() > 0) play = bestPlays.get(random.nextInt(bestPlays.size()));
 
-				if (isTraining) {
-					// Use random play with probability P=epsilon
-					float x = random.nextFloat();
-					if (x<epsilon) play = -1;
-				}
-
 				if (play == -1) {
 					// Choose a random play from the remaining legal plays
 					int c2 = random.nextInt(remainingPlays);
@@ -322,7 +314,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public String getName() {
-		return "HARGMCPlayerDepth" + depthLimit;
+		return "HAGMCPlayerDepth" + depthLimit;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -761,27 +753,22 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	public static void train(int depth) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		HARGMCPlayer player = new HARGMCPlayer(depth);
+		HAGMCPlayer player = new HAGMCPlayer(depth);
 		player.isTraining = true;
 		PokerSquares ps = new PokerSquares(player, system);
 		ps.setVerbose(false);
 
 		int iterations = 3000; // Number of games played during training
-		// delta is the exponential decay factor for epsilon (calculated so epsilon reaches 0.1 after all iterations)
-		double delta = Math.exp(Math.log(0.1f/player.epsilon)/iterations);
-		if (delta > 1) throw new RuntimeException("ERROR: delta>1 ("+delta+")");
-
 		for (int i=0; i<iterations; i++) {
 			int score = ps.play();
 			System.out.println(score);
-			player.epsilon *= delta; // decay epsilon after each iteration
 		}
-		System.out.println("Done! Completed "+iterations+" iterations. (final epsilon: "+player.epsilon+")");
+		System.out.println("Done! Completed "+iterations+" iterations.");
 	}
 
 	public static void main(String[] args) {
 		// === Test hand abstrations ===
-		// HARGMCPlayer player = new HARGMCPlayer(25);
+		// HAGMCPlayer player = new HAGMCPlayer(25);
 		// player.isTraining = true;
 		// player.init();
 		// player.testHandAbstraction();
@@ -789,7 +776,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 		// Play a single game
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		new PokerSquares(new HARGMCPlayer(25), system).play(); // play a single game
+		new PokerSquares(new HAGMCPlayer(25), system).play(); // play a single game
 	}
 
 }

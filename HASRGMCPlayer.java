@@ -9,12 +9,12 @@ import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 
 /**
- * (Hand Abstraction Reinforcement Greedy Monte Carlo Player)
- * HARGMCPlayer - a Monte Carlo implementation of the player interface for PokerSquares using an 
- * optimized greedy search as a playout policy, hand abstractions for partial evaluation, 
+ * (Hand Abstraction Simplified Reinforcement Greedy Monte Carlo Player)
+ * HASRGMCPlayer - a Monte Carlo implementation of the player interface for PokerSquares using an 
+ * optimized greedy search as a playout policy, (simplified) hand abstractions for partial evaluation, 
  * and reinforcement learning to learn hand abstraction values.
  */
-public class HARGMCPlayer implements PokerSquaresPlayer {
+public class HASRGMCPlayer implements PokerSquaresPlayer {
 	
 	private final int SIZE = 5; // number of rows/columns in square grid
 	private final int NUM_POS = SIZE * SIZE; // number of positions in square grid
@@ -45,13 +45,13 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to depth 2.
 	 */
-	public HARGMCPlayer() {}
+	public HASRGMCPlayer() {}
 	
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to a given depth limit.
 	 * @param depthLimit depth limit for random simulated play
 	 */
-	public HARGMCPlayer(int depthLimit) {
+	public HASRGMCPlayer(int depthLimit) {
 		this.depthLimit = depthLimit;
 	}
 	
@@ -322,7 +322,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public String getName() {
-		return "HARGMCPlayerDepth" + depthLimit;
+		return "HASRGMCPlayerDepth" + depthLimit;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -445,7 +445,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	// Used for partial hands of 1 to 4 cards (undefined for 0 or 5 card hands)
 	private int getHandAbstraction(Card[] hand, boolean isRow) {
 		/**
-		 * 16 bit Abstraction
+		 * 14 bit Abstraction
 		 * 3 bits: number of cards without a pair
 		 * 2 bits: number of pairs
 		 * 1 bit: if has 3 of a kind
@@ -453,18 +453,15 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 		 * 1 bit: if row
 		 * 2 bits: number of undealt cards of primary rank
 		 * 2 bits: number of undealt cards of secondsary rank (0 if 3 or more different ranks)
-		 * 2 bits: whether have not(0)/exactly(1)/more than(2) enough cards to become a straight
 		 * 2 bits: whether have not(0)/exactly(1)/more than(2) enough cards to become a flush
 		 */
 
 		// Compute counts
-		int numCards = 0;
 		int suit = -1; // Suit of first card
 		int suitCount = 0; // Number of cards of same suit (0 if there is more than 1 suit)
 		int[] rankCounts = new int[Card.NUM_RANKS];
 		for (Card card : hand) {
 			if (card != null) {
-				numCards++;
 				rankCounts[card.getRank()]++;
 				// Suit count
 				if (suit == -1) suit = card.getSuit();
@@ -511,79 +508,19 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 
 		// Initial flush/straight checks
 		boolean flushPossible = suitCount > 0;
-		boolean straightPossible = primaryRankCount <= 1;
-
-		// Straight check
-		int[] straightMissingRanks = new int[9];
-		int straightNumMissingRanks = 0;
-		if (straightPossible) {
-			straightPossible = false;
-			// Get the smallest rank in the hand
-			int minRank = 0;
-			while (rankCounts[minRank] == 0) minRank++;
-
-			// Get the largest rank in the hand
-			int maxRank = Card.NUM_RANKS - 1;
-			while (rankCounts[maxRank] == 0) maxRank--;
-
-			// Straight possible if the space between min and max rank cards is <= 4
-			int diff = maxRank - minRank;
-			if (diff <= 4) {
-				straightPossible = true;
-
-				// Cards needed are the ones missing between min and max AND the surplus before min or after max
-				int surplus = 4-diff;
-				int startRank = Math.max(minRank-surplus,0);
-				int endRank = Math.min(maxRank+surplus,Card.NUM_RANKS-1);
-				for (int rank=startRank; rank<=endRank; rank++) {
-					if (rankCounts[rank] == 0) {
-						straightMissingRanks[straightNumMissingRanks++] = rank;
-					}
-				}
-			}
-		}
 		
 		// Calculate number of important undealt cards using simDeck
 		int undealtPrimary = 0;
 		int undealtSecondary = 0;
 		int undealtFlushCount = 0;
-		int[] undealtStraightRanks = new int[straightNumMissingRanks];
 		for (int i=numPlays; i<simDeck.length; i++) {
 			Card card = simDeck[i];
 			if (card.getRank() == primaryRank) undealtPrimary++;
 			if (card.getRank() == secondaryRank) undealtSecondary++;
 			if (card.getSuit() == suit) undealtFlushCount++;
-			for (int j=0; j<straightNumMissingRanks; j++) {
-				if (card.getRank() == straightMissingRanks[j]) {
-					undealtStraightRanks[j]++;
-					break;
-				}
-			}
 		}
 
 		// Simplify undealt straight/flush counters to 0=not enough, 1=exactly enough, 2=more than enough
-		int undealtStraight = 0;
-		if (straightPossible) {
-			// Find the maximum subsequence of available undealt cards that will allow a straight, given sequence length is the number empty spots in the hand
-			int seqSize = 5-numCards; // sequence size is number of empty spaces in hand
-			int bestSequenceSum = 0;
-			int currentSequenceSum = 0;
-			int currentSequenceLength = 0;
-			for (int i=0; i<undealtStraightRanks.length; i++) {
-				if (undealtStraightRanks[i] == 0) {
-					currentSequenceSum = 0;
-					currentSequenceLength = 0;
-				}
-				else {
-					currentSequenceSum += undealtStraightRanks[i];
-					if (currentSequenceLength < seqSize) currentSequenceLength++;
-					else currentSequenceSum -= undealtStraightRanks[i-seqSize];
-					if (currentSequenceLength == seqSize && currentSequenceSum > bestSequenceSum) bestSequenceSum = currentSequenceSum;
-				}
-			}
-			if (bestSequenceSum>0) undealtStraight = 1;
-			if (bestSequenceSum>seqSize) undealtStraight = 2;
-		}
 		int undealtFlush = 0;
 		if (flushPossible) {
 			if (undealtFlushCount > SIZE-suitCount) undealtFlush = 2;
@@ -599,7 +536,6 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 		abstraction = (abstraction << 1) | (isRow?1:0);
 		abstraction = (abstraction << 2) | undealtPrimary;
 		abstraction = (abstraction << 2) | undealtSecondary;
-		abstraction = (abstraction << 2) | undealtStraight;
 		abstraction = (abstraction << 2) | undealtFlush;
 		return abstraction;
 	}
@@ -607,7 +543,6 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	// Used for debugging
 	private String abstractionToString(int abstraction) {
 		String result = "";
-		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
 		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
 		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
 		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
@@ -626,47 +561,47 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 		// Manually create test hands
 		System.out.println("=== MANUAL TESTS ===");
 		int[][][][] testHands = {
-			// Tests for: Num pairs & primary/secondary rank
-			{{{0,0},{0,1},{0,2},{2,3}}, {{0b0010010101110000}}},
-			{{{0,0},{0,1},{2,2},{2,3}}, {{0b0001000010100000}}},
-			{{{0,0},{2,1},{2,2},{2,3}}, {{0b0010010101110000}}},
-			{{{0,0},{1,1},{2,2},{2,3}}, {{0b0100100010000000}}},
-			{{{0,0},{2,1},{1,2},{2,3}}, {{0b0100100110000000}}},
-			{{{0,0},{2,1},{2,2},{1,3}}, {{0b0100100010000000}}},
+			// // Tests for: Num pairs & primary/secondary rank
+			// {{{0,0},{0,1},{0,2},{2,3}}, {{0b0010010101110000}}},
+			// {{{0,0},{0,1},{2,2},{2,3}}, {{0b0001000010100000}}},
+			// {{{0,0},{2,1},{2,2},{2,3}}, {{0b0010010101110000}}},
+			// {{{0,0},{1,1},{2,2},{2,3}}, {{0b0100100010000000}}},
+			// {{{0,0},{2,1},{1,2},{2,3}}, {{0b0100100110000000}}},
+			// {{{0,0},{2,1},{2,2},{1,3}}, {{0b0100100010000000}}},
 
-			// Tests for: 3/4 of a kind
-			{{{0,0},{0,1},{0,2},{0,3}}, {{0b0000001100000000}}},
-			{{{1,0},{0,1},{0,2},{0,3}}, {{0b0010010001110000}}},
-			{{{1,0},{0,1},{1,2},{1,3}}, {{0b0010010101110000}}},
-			{{{1,0},{1,2},{1,3}}, {{0b0000010001000000}}},
+			// // Tests for: 3/4 of a kind
+			// {{{0,0},{0,1},{0,2},{0,3}}, {{0b0000001100000000}}},
+			// {{{1,0},{0,1},{0,2},{0,3}}, {{0b0010010001110000}}},
+			// {{{1,0},{0,1},{1,2},{1,3}}, {{0b0010010101110000}}},
+			// {{{1,0},{1,2},{1,3}}, {{0b0000010001000000}}},
 
-			// Tests for: undealt straight
-			{{{0,0}}, {{0b0010000111001010}}},
-			{{{0,0},{1,1}}, {{0b0100000011111000}}},
-			{{{0,0},{1,1},{2,2}}, {{0b0110000111001000}}},
-			{{{0,0},{1,1},{2,2},{3,3}}, {{0b1000000011001000}}},
-			{{{6,0},{1,1},{2,2},{3,3}}, {{0b1000000111000000}}},
-			{{{6,0},{2,2},{3,3}}, {{0b0110000011001000}}},
-			{{{6,0},{9,1}}, {{0b0100000111111000}}},
-			{{{9,1}}, {{0b0010000011001010}}},
-			{{{8,1}}, {{0b0010000111001010}}},
-			{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1}}, {{0b1000000011001000}}},
-			{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2}}, {{0b1000000111000100}}},
-			{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{4,3}}, {{0b1000000011000000}}},
-			{{{6,0},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{5,0},{5,1},{5,2}}, {{0b0110000111000100}}},
-			{{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1},{10,2}}, {{0b0100000011110100}}},
-			{{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1}}, {{0b0100000111111000}}},
+			// // Tests for: undealt straight
+			// {{{0,0}}, {{0b0010000111001010}}},
+			// {{{0,0},{1,1}}, {{0b0100000011111000}}},
+			// {{{0,0},{1,1},{2,2}}, {{0b0110000111001000}}},
+			// {{{0,0},{1,1},{2,2},{3,3}}, {{0b1000000011001000}}},
+			// {{{6,0},{1,1},{2,2},{3,3}}, {{0b1000000111000000}}},
+			// {{{6,0},{2,2},{3,3}}, {{0b0110000011001000}}},
+			// {{{6,0},{9,1}}, {{0b0100000111111000}}},
+			// {{{9,1}}, {{0b0010000011001010}}},
+			// {{{8,1}}, {{0b0010000111001010}}},
+			// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1}}, {{0b1000000011001000}}},
+			// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2}}, {{0b1000000111000100}}},
+			// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{4,3}}, {{0b1000000011000000}}},
+			// {{{6,0},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{5,0},{5,1},{5,2}}, {{0b0110000111000100}}},
+			// {{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1},{10,2}}, {{0b0100000011110100}}},
+			// {{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1}}, {{0b0100000111111000}}},
 
-			// Tests for: undealt flush
-			{{{0,0}}, {{0b0010000011001010}}},
-			{{{0,0},{1,0}}, {{0b0100000111111010}}},
-			{{{0,0},{1,0},{2,0}}, {{0b0110000011001010}}},
-			{{{0,0},{1,0},{2,0},{3,0}}, {{0b1000000111001010}}},
-			{{{0,0},{1,1}}, {{0b0100000011111000}}},
-			{{{0,1},{1,0},{2,0}}, {{0b0110000111001000}}},
-			{{{0,0},{1,0},{2,1},{3,0}}, {{0b1000000011001000}}},
-			{{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0},{12,0}}, {{0b1000000111001000}}},
-			{{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0}}, {{0b1000000011001001}}},
+			// // Tests for: undealt flush
+			// {{{0,0}}, {{0b0010000011001010}}},
+			// {{{0,0},{1,0}}, {{0b0100000111111010}}},
+			// {{{0,0},{1,0},{2,0}}, {{0b0110000011001010}}},
+			// {{{0,0},{1,0},{2,0},{3,0}}, {{0b1000000111001010}}},
+			// {{{0,0},{1,1}}, {{0b0100000011111000}}},
+			// {{{0,1},{1,0},{2,0}}, {{0b0110000111001000}}},
+			// {{{0,0},{1,0},{2,1},{3,0}}, {{0b1000000011001000}}},
+			// {{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0},{12,0}}, {{0b1000000111001000}}},
+			// {{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0}}, {{0b1000000011001001}}},
 
 		};
 		for (int i = 0; i < testHands.length; i++) {
@@ -761,7 +696,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 	public static void train(int depth) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		HARGMCPlayer player = new HARGMCPlayer(depth);
+		HASRGMCPlayer player = new HASRGMCPlayer(depth);
 		player.isTraining = true;
 		PokerSquares ps = new PokerSquares(player, system);
 		ps.setVerbose(false);
@@ -781,7 +716,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 
 	public static void main(String[] args) {
 		// === Test hand abstrations ===
-		// HARGMCPlayer player = new HARGMCPlayer(25);
+		// HASRGMCPlayer player = new HASRGMCPlayer(25);
 		// player.isTraining = true;
 		// player.init();
 		// player.testHandAbstraction();
@@ -789,7 +724,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 		// Play a single game
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		new PokerSquares(new HARGMCPlayer(25), system).play(); // play a single game
+		new PokerSquares(new HASRGMCPlayer(25), system).play(); // play a single game
 	}
 
 }
