@@ -9,11 +9,12 @@ import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 
 /**
- * (Hand Abstraction Greedy Monte Carlo Player)
- * HAGMCPlayer - a simple  Monte Carlo implementation of the player interface for PokerSquares using an 
- * optimized greedy search as a playout policy and hand abstractions for partial evaluation.
+ * (Hand Abstraction Reinforcement Greedy Monte Carlo Player)
+ * HARGMCPlayer - a Monte Carlo implementation of the player interface for PokerSquares using an 
+ * optimized greedy search as a playout policy, hand abstractions for partial evaluation, 
+ * and reinforcement learning to learn hand abstraction values.
  */
-public class HAGMCPlayer implements PokerSquaresPlayer {
+public class HARGMCPlayer implements PokerSquaresPlayer {
 	
 	private final int SIZE = 5; // number of rows/columns in square grid
 	private final int NUM_POS = SIZE * SIZE; // number of positions in square grid
@@ -34,9 +35,8 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 
 	// New fields (different from RandomMCPlayer)
 	private HashMap<Integer,Float[]> abstractionUtilities; // Hashmap storing the average utility for hand abstractions.
-	private final File UTILITY_FILE = new File(getName()+"_HAUtilities.map");
-	private final float epsilon = 0.5f; // Initial probability of making a random move during Monte Carlo simulation
-	private final float delta = 0.9992f; // Exponential decay factor for epsilon (calculated so epsilon reaches 0.1 after 2000 iteration)
+	private File utilityFile;
+	public float epsilon = 0.5f; // Initial probability of making a random move during Monte Carlo simulation
 	private int[][] trainingAbstractions = new int[SIZE * 2][SIZE-1]; // Stores the 4 partial hand abstractions that occur during the game 
 																	  // for each of the 10 rows/cols (only used if training)
 
@@ -45,13 +45,13 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to depth 2.
 	 */
-	public HAGMCPlayer() {}
+	public HARGMCPlayer() {}
 	
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to a given depth limit.
 	 * @param depthLimit depth limit for random simulated play
 	 */
-	public HAGMCPlayer(int depthLimit) {
+	public HARGMCPlayer(int depthLimit) {
 		this.depthLimit = depthLimit;
 	}
 	
@@ -60,6 +60,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public void init() { 
+		utilityFile = new File(getName()+"_HAUtilities.map");
 		loadUtilityMap();
 		// clear grid
 		for (int row = 0; row < SIZE; row++)
@@ -103,7 +104,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 			long millisPerMoveEval = millisPerPlay / remainingPlays; // dividing time evenly across moves now considered
 			// copy the play positions (row-major indices) that are empty
 			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
-			double maxAverageScore = Double.NEGATIVE_INFINITY; // maximum average score found for moves so far
+			float maxAverageScore = Float.NEGATIVE_INFINITY; // maximum average score found for moves so far
 			ArrayList<Integer> bestPlays = new ArrayList<Integer>(); // all plays yielding the maximum average score 
 			for (int i = 0; i < remainingPlays; i++) { // for each legal play position
 				int play = legalPlayLists[numPlays][i];
@@ -111,7 +112,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 				long endTime = startTime + millisPerMoveEval; // compute when MC simulations should end
 				makePlay(card, play / SIZE, play % SIZE);  // play the card at the empty position
 				int simCount = 0;
-				int scoreTotal = 0;
+				float scoreTotal = 0;
 				while (System.currentTimeMillis() < endTime) { // perform as many MC simulations as possible through the allotted time
 					// Perform a Monte Carlo simulation of random play to the depth limit or game end, whichever comes first.
 					scoreTotal += simPlay(depthLimit);  // accumulate MC simulation scores
@@ -119,7 +120,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 				}
 				undoPlay(); // undo the play under evaluation
 				// update (if necessary) the maximum average score and the list of best plays
-				double averageScore = (double) scoreTotal / simCount;
+				float averageScore = scoreTotal / simCount;
 				if (averageScore >= maxAverageScore) {
 					if (averageScore > maxAverageScore)
 						bestPlays.clear();
@@ -169,14 +170,10 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 			// After the last play, update the utility map with the final hand score for each row/col
 			if (numPlays==25) {
 				int[] handScores = system.getHandScores(grid);
-
-				System.out.println("[trainingAbstractions]");
-
 				for (int i = 0; i < handScores.length; i++) {
 					int handScore = handScores[i];
 					for (int j = 0; j < trainingAbstractions[i].length; j++) {
 						int abstraction = trainingAbstractions[i][j];
-						System.out.print(abstractionToString(abstraction)+" ");
 						if (abstractionUtilities.containsKey(abstraction)) {
 							// Update entry
 							Float[] utilityArray = abstractionUtilities.get(abstraction);
@@ -192,11 +189,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 							abstractionUtilities.put(abstraction, utilityArray);
 						}
 					}
-					System.out.println();
 				}
-				System.out.println();
-				// System.out.print("Saved: ");
-				// printUtilityMap();
 				// Save the updated utility map
 				saveUtilityMap();
 			}
@@ -213,7 +206,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	 * @param depthLimit - how many simulated random plays to perform
 	 * @return resulting grid score after random MC simulation to given depthLimit
 	 */
-	private int simPlay(int depthLimit) {
+	private float simPlay(int depthLimit) {
 		if (depthLimit == 0) { // with zero depth limit, return current score
 			return getGridUtility();
 		}
@@ -228,9 +221,16 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 				int remainingPlays = NUM_POS - numPlays;
 				System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
 
+				// Short-circuit the forced last play
+				if (remainingPlays == 1) {
+					int play = legalPlayLists[numPlays][0];
+					makePlay(card, play / SIZE, play % SIZE);
+					break;
+				}
+
 				// Choose play that gives best utility increase
-				int maxUtility = Integer.MIN_VALUE;
-				int play = -1;
+				float maxUtility = Integer.MIN_VALUE;
+				ArrayList<Integer> bestPlays = new ArrayList<Integer>(); // all plays yielding the maximum utility
 				for (int i = 0; i < remainingPlays; i++) {
 					int currentPlay = legalPlayLists[numPlays][i];
 					// Calculate utility for the current row+col of this play
@@ -238,18 +238,24 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 					int col = currentPlay % SIZE;
 					Card[] rowHand = getHandByRow(row);
 					Card[] columnHand = getHandByRow(col);
-					int currentUtility = getHandUtility(rowHand, true)+getHandUtility(columnHand, false);
+					float currentUtility = getHandUtility(rowHand, true)+getHandUtility(columnHand, false);
 					// Calculate utility for the row+col if the play was made
 					rowHand[col] = card;
 					columnHand[row] = card;
-					int afterPlayUtility = getHandUtility(rowHand, true)+getHandUtility(columnHand, false);
+					float afterPlayUtility = getHandUtility(rowHand, true)+getHandUtility(columnHand, false);
 					// Keep track of max utility increase
-					int playUtility = afterPlayUtility - currentUtility;
-					if (playUtility > maxUtility) {
+					float playUtility = afterPlayUtility - currentUtility;
+					if (playUtility >= maxUtility) {
+						if (playUtility > maxUtility) {
+							bestPlays.clear();
+						}
+						bestPlays.add(currentPlay);
 						maxUtility = playUtility;
-						play = currentPlay;
 					}
 				}
+				int play = -1;
+				// choose a best play (breaking ties randomly)
+				if (bestPlays.size() > 0) play = bestPlays.get(random.nextInt(bestPlays.size()));
 
 				if (isTraining) {
 					// Use random play with probability P=epsilon
@@ -265,7 +271,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 
 				makePlay(card, play / SIZE, play % SIZE);
 			}
-			int score = getGridUtility();
+			float score = getGridUtility();
 
 			// Undo MC plays.
 			for (int d = 0; d < depth; d++) {
@@ -316,21 +322,21 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public String getName() {
-		return "HAGMCPlayerDepth" + depthLimit;
+		return "HARGMCPlayerDepth" + depthLimit;
 	}
 
 	@SuppressWarnings("unchecked")
 	private void loadUtilityMap() {
 		// Check if file exists
-		if (!UTILITY_FILE.isFile() && !isTraining) {
+		if (!utilityFile.isFile() && !isTraining) {
 			// Show error to user
-			System.out.println("Error (Player "+getName()+") - could not find utility map file "+UTILITY_FILE.getName()+". Make sure the file exists and is in the same directory.");
+			System.out.println("Error (Player "+getName()+") - could not find utility map file "+utilityFile.getName()+". Make sure the file exists and is in the same directory.");
 			abstractionUtilities = new HashMap<Integer,Float[]>();
 			return;
 		}
 
 		try (
-			FileInputStream f = new FileInputStream(UTILITY_FILE);
+			FileInputStream f = new FileInputStream(utilityFile);
 			ObjectInputStream s = new ObjectInputStream(f);
 		) {
 			abstractionUtilities = (HashMap<Integer,Float[]>)s.readObject();
@@ -339,13 +345,9 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 			// Can't load file - initialize to empty map
 			abstractionUtilities = new HashMap<Integer,Float[]>();
 			if (!isTraining) {
-				System.out.println("Error (Player "+getName()+") - could not load utility map from file "+UTILITY_FILE.getName()+". Message: "+e.getMessage());
+				System.out.println("Error (Player "+getName()+") - could not load utility map from file "+utilityFile.getName()+". Message: "+e.getMessage());
 			}
 		}
-
-		// todo: remove (DEBUG)
-		// System.out.print("Loaded: ");
-		// printUtilityMap();
 	}
 
 	private void saveUtilityMap() {
@@ -353,10 +355,10 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		if (!isTraining) return;
 
 		// Create file if doesn't exist
-		if (!UTILITY_FILE.isFile() && !isTraining) {
+		if (!utilityFile.isFile() && !isTraining) {
 			System.out.print("Utility map file doesn't exist. Creating new one...");
 			try {
-				UTILITY_FILE.createNewFile();
+				utilityFile.createNewFile();
 				System.out.println("Done!");
 			}
 			catch (Exception e) {
@@ -366,13 +368,13 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 
 		// Save to file (override if exists)
 		try (
-			FileOutputStream f = new FileOutputStream(UTILITY_FILE);
+			FileOutputStream f = new FileOutputStream(utilityFile);
 			ObjectOutputStream s = new ObjectOutputStream(f);
 		) {
 			s.writeObject(abstractionUtilities);
 		}
 		catch (Exception e) {
-			System.out.println("Error (Player "+getName()+") - could not save utility map to file "+UTILITY_FILE.getName()+". Message: "+e.getMessage());
+			System.out.println("Error (Player "+getName()+") - could not save utility map to file "+utilityFile.getName()+". Message: "+e.getMessage());
 		}
 	}
 
@@ -387,8 +389,8 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		System.out.println();
 	}
 
-	private int getGridUtility() {
-		int gridUtility = 0;
+	private float getGridUtility() {
+		float gridUtility = 0;
 		for (int row = 0; row < SIZE; row++) {
 			gridUtility += getHandUtility(getHandByRow(row), true);
 		}
@@ -414,8 +416,8 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		return hand;
 	}
 
-	private int getHandUtility(Card[] hand, boolean isRow) {
-		int utility = 0;
+	private float getHandUtility(Card[] hand, boolean isRow) {
+		float utility = 0;
 		int numCards = 0;
 		for (int i = 0; i < SIZE ; i++) {
 			if (hand[i] != null) numCards++;
@@ -426,17 +428,17 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		return utility;
 	}
 
-	private int getPartialHandUtility(Card[] hand, boolean isRow) {
+	private float getPartialHandUtility(Card[] hand, boolean isRow) {
 		int abstraction = getHandAbstraction(hand, isRow);
-		int utility = evaluateHandAbstraction(abstraction);
+		float utility = evaluateHandAbstraction(abstraction);
 		return utility;
 	}
 
-	private int evaluateHandAbstraction(int abstraction) {
+	private float evaluateHandAbstraction(int abstraction) {
 		// Get the utility from the map (0 if doesn't exist)
-		int utility = 
+		float utility = 
 			abstractionUtilities.containsKey(abstraction) ? 
-			(abstractionUtilities.get(abstraction)[0]).intValue() : 0;
+			abstractionUtilities.get(abstraction)[0] : 0;
 		return utility;
 	}
 
@@ -451,8 +453,8 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		 * 1 bit: if row
 		 * 2 bits: number of undealt cards of primary rank
 		 * 2 bits: number of undealt cards of secondsary rank (0 if 3 or more different ranks)
-		 * 2 bits: whether have not(0)/exactly(1)/more than(2) enough cards to become a flush
 		 * 2 bits: whether have not(0)/exactly(1)/more than(2) enough cards to become a straight
+		 * 2 bits: whether have not(0)/exactly(1)/more than(2) enough cards to become a flush
 		 */
 
 		// Compute counts
@@ -587,14 +589,6 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 			if (undealtFlushCount > SIZE-suitCount) undealtFlush = 2;
 			else if (undealtFlushCount == SIZE-suitCount) undealtFlush = 1;
 		}
-
-		// ! Checks used for debugging
-		// if (numCardsWithoutPairs>4) System.out.println("[ERROR] numCardsWithoutPairs invalid: "+numCardsWithoutPairs);
-		// if (numPairs>2) System.out.println("[ERROR] numPairs invalid: "+numPairs);
-		// if (undealtPrimary>3) System.out.println("[ERROR] undealtPrimary invalid: "+undealtPrimary);
-		// if (undealtSecondary>3) System.out.println("[ERROR] undealtSecondary invalid: "+undealtSecondary);
-		// if (undealtStraight>2) System.out.println("[ERROR] undealtStraight invalid: "+undealtStraight);
-		// if (undealtFlush>2) System.out.println("[ERROR] undealtFlush invalid: "+undealtFlush);
 
 		// Build 16-bit abstraction
 		int abstraction = 0;
@@ -764,22 +758,36 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		}
 	}
 
-	/**
-	 * Demonstrate RandomMCPlay with Ameritish point system.
-	 * @param args (not used)
-	 */
-	public static void main(String[] args) {
+	private static void train(int depth) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		HAGMCPlayer player = new HAGMCPlayer(2);
+		HARGMCPlayer player = new HARGMCPlayer(depth);
 		player.isTraining = true;
-		new PokerSquares(player, system).play(); // play a single game
+		PokerSquares ps = new PokerSquares(player, system);
+		ps.setVerbose(false);
 
+		int iterations = 3000; // Number of games played during training
+		// delta is the exponential decay factor for epsilon (calculated so epsilon reaches 0.1 after all iterations)
+		double delta = Math.exp(Math.log(0.1f/player.epsilon)/iterations);
+		if (delta > 1) throw new RuntimeException("ERROR: delta>1 ("+delta+")");
+
+		for (int i=0; i<iterations; i++) {
+			int score = ps.play();
+			System.out.println(score);
+			player.epsilon *= delta; // decay epsilon after each iteration
+		}
+		System.out.println("Done! Completed "+iterations+" iterations. (final epsilon: "+player.epsilon+")");
+	}
+
+	public static void main(String[] args) {
 		// === Test hand abstrations ===
-		// HAGMCPlayer player = new HAGMCPlayer(2);
+		// HARGMCPlayer player = new HARGMCPlayer(2);
 		// player.isTraining = true;
 		// player.init();
 		// player.testHandAbstraction();
+
+		// === Train ===
+		train(25);
 	}
 
 }
