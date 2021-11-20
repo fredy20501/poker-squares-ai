@@ -377,7 +377,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	}
 
 	// Used for debugging
-	private void printUtilityMap() {
+	public void printUtilityMap() {
 		System.out.println("[Utility Map]");
 		abstractionUtilities.entrySet().forEach(entry -> {
 			Float[] utilityArray = entry.getValue();
