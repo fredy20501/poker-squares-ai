@@ -1,6 +1,12 @@
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.HashMap;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.ObjectInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
 
 /**
  * (Hand Abstraction Greedy Monte Carlo Player)
@@ -14,17 +20,27 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	private final int NUM_CARDS = Card.NUM_CARDS; // number of cards in deck
 	private Random random = new Random(); // pseudorandom number generator for Monte Carlo simulation 
 	private int[] plays = new int[NUM_POS]; // positions of plays so far (index 0 through numPlays - 1) recorded as integers using row-major indices.
-	// row-major indices: play (r, c) is recorded as a single integer r * SIZE + c (See http://en.wikipedia.org/wiki/Row-major_order)
-	// From plays index [numPlays] onward, we maintain a list of yet unplayed positions.
+											// row-major indices: play (r, c) is recorded as a single integer r * SIZE + c (See http://en.wikipedia.org/wiki/Row-major_order)
+											// From plays index [numPlays] onward, we maintain a list of yet unplayed positions.
 	private int numPlays = 0; // number of Cards played into the grid so far
 	private PokerSquaresPointSystem system; // point system
-	private int depthLimit = 2; // default depth limit for Random Monte Carlo (MC) play
+	private int depthLimit = 2; // default depth limit for Monte Carlo (MC) play
 	private Card[][] grid = new Card[SIZE][SIZE]; // grid with Card objects or null (for empty positions)
 	private Card[] simDeck = Card.getAllCards(); // a list of all Cards. As we learn the index of cards in the play deck,
 	                                             // we swap each dealt card to its correct index.  Thus, from index numPlays 
 												 // onward, we maintain a list of undealt cards for MC simulation.
 	private int[][] legalPlayLists = new int[NUM_POS][NUM_POS]; // stores legal play lists indexed by numPlays (depth)
 	// (This avoids constant allocation/deallocation of such lists during the selections of MC simulations.)
+
+	// New fields (different from RandomMCPlayer)
+	private HashMap<Integer,Float[]> abstractionUtilities; // Hashmap storing the average utility for hand abstractions.
+	private final File UTILITY_FILE = new File(getName()+"_HAUtilities.map");
+	private final float epsilon = 0.5f; // Initial probability of making a random move during Monte Carlo simulation
+	private final float delta = 0.9992f; // Exponential decay factor for epsilon (calculated so epsilon reaches 0.1 after 2000 iteration)
+	private int[][] trainingAbstractions = new int[SIZE * 2][SIZE-1]; // Stores the 4 partial hand abstractions that occur during the game 
+																	  // for each of the 10 rows/cols (only used if training)
+
+	public boolean isTraining = false;
 
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to depth 2.
@@ -44,6 +60,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public void init() { 
+		loadUtilityMap();
 		// clear grid
 		for (int row = 0; row < SIZE; row++)
 			for (int col = 0; col < SIZE; col++)
@@ -119,9 +136,75 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 			plays[numPlays] = bestPlay;
 		}
 
-		int[] playPos = {plays[numPlays] / SIZE, plays[numPlays] % SIZE}; // decode it into row and column
-		makePlay(card, playPos[0], playPos[1]); // make the chosen play (not undoing this time)
-		return playPos; // return the chosen play
+		// decode play into row and column
+		int row = plays[numPlays] / SIZE;
+		int col = plays[numPlays] % SIZE;
+		makePlay(card, row, col); // make the chosen play (not undoing this time)
+		
+		// (only for training) Keep track of partial abstraction as the game progress 
+		if (isTraining) {
+			// Get hands affected by the new play
+			Card[] rowHand = getHandByRow(row);
+			Card[] colHand = getHandByColumn(col);
+			
+			/* Save partial hand abstractions (1 to 4 card hands) for both row and column */
+			// Row
+			int numCards = 0;
+			for (Card c : rowHand) {
+				if (c != null) numCards++;
+			}
+			if (numCards > 0 && numCards < SIZE) {
+				trainingAbstractions[row][numCards-1] = getHandAbstraction(rowHand, true);
+			}
+			
+			// Col
+			numCards = 0;
+			for (Card c : colHand) {
+				if (c != null) numCards++;
+			}
+			if (numCards > 0 && numCards < SIZE) {
+				trainingAbstractions[col+SIZE][numCards-1] = getHandAbstraction(colHand, false);
+			}
+
+			// After the last play, update the utility map with the final hand score for each row/col
+			if (numPlays==25) {
+				int[] handScores = system.getHandScores(grid);
+
+				System.out.println("[trainingAbstractions]");
+
+				for (int i = 0; i < handScores.length; i++) {
+					int handScore = handScores[i];
+					for (int j = 0; j < trainingAbstractions[i].length; j++) {
+						int abstraction = trainingAbstractions[i][j];
+						System.out.print(abstractionToString(abstraction)+" ");
+						if (abstractionUtilities.containsKey(abstraction)) {
+							// Update entry
+							Float[] utilityArray = abstractionUtilities.get(abstraction);
+							Float prevMean = utilityArray[0];
+							Float count = utilityArray[1]+1.0f;
+							utilityArray[0] = prevMean + (handScore - prevMean)/count;
+							utilityArray[1] = count;
+							abstractionUtilities.put(abstraction, utilityArray);
+						}
+						else {
+							// Create entry
+							Float[] utilityArray = {(float)handScore, 1.0f};
+							abstractionUtilities.put(abstraction, utilityArray);
+						}
+					}
+					System.out.println();
+				}
+				System.out.println();
+				// System.out.print("Saved: ");
+				// printUtilityMap();
+				// Save the updated utility map
+				saveUtilityMap();
+			}
+		}
+
+		// Return the chosen play
+		int[] playPos = {row, col};
+		return playPos; 
 	}
 
 	/**
@@ -132,25 +215,57 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	 */
 	private int simPlay(int depthLimit) {
 		if (depthLimit == 0) { // with zero depth limit, return current score
-			return system.getScore(grid);
+			return getGridUtility();
 		}
-		else { // up to the non-zero depth limit or to game end, iteratively make the given number of random plays 
-			int score = Integer.MIN_VALUE;
-			int maxScore = Integer.MIN_VALUE;
+		else { // up to the non-zero depth limit or to game end, iteratively make the given number of random plays
 			int depth = Math.min(depthLimit, NUM_POS - numPlays); // compute real depth limit, taking into account game end
 			for (int d = 0; d < depth; d++) {
 				// generate a random card draw
 				int c = random.nextInt(NUM_CARDS - numPlays) + numPlays;
 				Card card = simDeck[c];
-				// choose a random play from the legal plays
 
+				// Get list of remaning legal plays
 				int remainingPlays = NUM_POS - numPlays;
 				System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
-				int c2 = random.nextInt(remainingPlays);
-				int play = legalPlayLists[numPlays][c2];
+
+				// Choose play that gives best utility increase
+				int maxUtility = Integer.MIN_VALUE;
+				int play = -1;
+				for (int i = 0; i < remainingPlays; i++) {
+					int currentPlay = legalPlayLists[numPlays][i];
+					// Calculate utility for the current row+col of this play
+					int row = currentPlay / SIZE;
+					int col = currentPlay % SIZE;
+					Card[] rowHand = getHandByRow(row);
+					Card[] columnHand = getHandByRow(col);
+					int currentUtility = getHandUtility(rowHand, true)+getHandUtility(columnHand, false);
+					// Calculate utility for the row+col if the play was made
+					rowHand[col] = card;
+					columnHand[row] = card;
+					int afterPlayUtility = getHandUtility(rowHand, true)+getHandUtility(columnHand, false);
+					// Keep track of max utility increase
+					int playUtility = afterPlayUtility - currentUtility;
+					if (playUtility > maxUtility) {
+						maxUtility = playUtility;
+						play = currentPlay;
+					}
+				}
+
+				if (isTraining) {
+					// Use random play with probability P=epsilon
+					float x = random.nextFloat();
+					if (x<epsilon) play = -1;
+				}
+
+				if (play == -1) {
+					// Choose a random play from the remaining legal plays
+					int c2 = random.nextInt(remainingPlays);
+					play = legalPlayLists[numPlays][c2];
+				}
+
 				makePlay(card, play / SIZE, play % SIZE);
 			}
-			score = system.getScore(grid);
+			int score = getGridUtility();
 
 			// Undo MC plays.
 			for (int d = 0; d < depth; d++) {
@@ -204,8 +319,125 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		return "HAGMCPlayerDepth" + depthLimit;
 	}
 
-	private int getScore(Card[][] grid) {
-		return 0;
+	@SuppressWarnings("unchecked")
+	private void loadUtilityMap() {
+		// Check if file exists
+		if (!UTILITY_FILE.isFile() && !isTraining) {
+			// Show error to user
+			System.out.println("Error (Player "+getName()+") - could not find utility map file "+UTILITY_FILE.getName()+". Make sure the file exists and is in the same directory.");
+			abstractionUtilities = new HashMap<Integer,Float[]>();
+			return;
+		}
+
+		try (
+			FileInputStream f = new FileInputStream(UTILITY_FILE);
+			ObjectInputStream s = new ObjectInputStream(f);
+		) {
+			abstractionUtilities = (HashMap<Integer,Float[]>)s.readObject();
+		}
+		catch (Exception e) {
+			// Can't load file - initialize to empty map
+			abstractionUtilities = new HashMap<Integer,Float[]>();
+			if (!isTraining) {
+				System.out.println("Error (Player "+getName()+") - could not load utility map from file "+UTILITY_FILE.getName()+". Message: "+e.getMessage());
+			}
+		}
+
+		// todo: remove (DEBUG)
+		// System.out.print("Loaded: ");
+		// printUtilityMap();
+	}
+
+	private void saveUtilityMap() {
+		// This should only be used when training
+		if (!isTraining) return;
+
+		// Create file if doesn't exist
+		if (!UTILITY_FILE.isFile() && !isTraining) {
+			System.out.print("Utility map file doesn't exist. Creating new one...");
+			try {
+				UTILITY_FILE.createNewFile();
+				System.out.println("Done!");
+			}
+			catch (Exception e) {
+				System.out.println("Error: "+e.getMessage());
+			}
+		}
+
+		// Save to file (override if exists)
+		try (
+			FileOutputStream f = new FileOutputStream(UTILITY_FILE);
+			ObjectOutputStream s = new ObjectOutputStream(f);
+		) {
+			s.writeObject(abstractionUtilities);
+		}
+		catch (Exception e) {
+			System.out.println("Error (Player "+getName()+") - could not save utility map to file "+UTILITY_FILE.getName()+". Message: "+e.getMessage());
+		}
+	}
+
+	// Used for debugging
+	private void printUtilityMap() {
+		System.out.println("[Utility Map]");
+		abstractionUtilities.entrySet().forEach(entry -> {
+			Float[] utilityArray = entry.getValue();
+			String abstraction = abstractionToString(entry.getKey());
+			System.out.println(abstraction + ": avg(" +utilityArray[0]+") count(" + utilityArray[1]+")");
+		});
+		System.out.println();
+	}
+
+	private int getGridUtility() {
+		int gridUtility = 0;
+		for (int row = 0; row < SIZE; row++) {
+			gridUtility += getHandUtility(getHandByRow(row), true);
+		}
+		for (int col = 0; col < SIZE; col++) {
+			gridUtility += getHandUtility(getHandByColumn(col), false);
+		}
+		return gridUtility;
+	}
+
+	private Card[] getHandByRow(int row) {
+		Card[] hand = new Card[SIZE];
+		for (int col = 0; col < SIZE; col++) {
+			hand[col] = grid[row][col];
+		}
+		return hand;
+	}
+
+	private Card[] getHandByColumn(int col) {
+		Card[] hand = new Card[SIZE];
+		for (int row = 0; row < SIZE; row++) {
+			hand[row] = grid[row][col];
+		}
+		return hand;
+	}
+
+	private int getHandUtility(Card[] hand, boolean isRow) {
+		int utility = 0;
+		int numCards = 0;
+		for (int i = 0; i < SIZE ; i++) {
+			if (hand[i] != null) numCards++;
+		}
+		if (numCards == 0) utility = 0;
+		else if (numCards == 5) utility = system.getHandScore(hand);
+		else utility = getPartialHandUtility(hand, isRow);
+		return utility;
+	}
+
+	private int getPartialHandUtility(Card[] hand, boolean isRow) {
+		int abstraction = getHandAbstraction(hand, isRow);
+		int utility = evaluateHandAbstraction(abstraction);
+		return utility;
+	}
+
+	private int evaluateHandAbstraction(int abstraction) {
+		// Get the utility from the map (0 if doesn't exist)
+		int utility = 
+			abstractionUtilities.containsKey(abstraction) ? 
+			(abstractionUtilities.get(abstraction)[0]).intValue() : 0;
+		return utility;
 	}
 
 	// Used for partial hands of 1 to 4 cards (undefined for 0 or 5 card hands)
@@ -356,33 +588,13 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 			else if (undealtFlushCount == SIZE-suitCount) undealtFlush = 1;
 		}
 
-
-		// ! DEBUG CHECK (REMOVE ME)
-		// ! DEBUG CHECK (REMOVE ME)
-		// ! DEBUG CHECK (REMOVE ME)
-		// ! DEBUG CHECK (REMOVE ME)
-		if (numCardsWithoutPairs>4) System.out.println("[ERROR] numCardsWithoutPairs invalid: "+numCardsWithoutPairs);
-		if (numPairs>2) System.out.println("[ERROR] numPairs invalid: "+numPairs);
-		if (undealtPrimary>3) System.out.println("[ERROR] undealtPrimary invalid: "+undealtPrimary);
-		if (undealtSecondary>3) System.out.println("[ERROR] undealtSecondary invalid: "+undealtSecondary);
-		if (undealtStraight>2) System.out.println("[ERROR] undealtStraight invalid: "+undealtStraight);
-		if (undealtFlush>2) System.out.println("[ERROR] undealtFlush invalid: "+undealtFlush);
-		System.out.println(
-			numCardsWithoutPairs+" "+
-			numPairs+" "+
-			(hasThreeOfAKind?1:0)+" "+
-			(hasFourOfAKind?1:0)+" "+
-			(isRow?1:0)+" "+
-			undealtPrimary+" "+
-			undealtSecondary+" "+
-			undealtStraight+" "+
-			undealtFlush
-		);
-		// ! DEBUG CHECK (REMOVE ME)
-		// ! DEBUG CHECK (REMOVE ME)
-		// ! DEBUG CHECK (REMOVE ME)
-		// ! DEBUG CHECK (REMOVE ME)
-
+		// ! Checks used for debugging
+		// if (numCardsWithoutPairs>4) System.out.println("[ERROR] numCardsWithoutPairs invalid: "+numCardsWithoutPairs);
+		// if (numPairs>2) System.out.println("[ERROR] numPairs invalid: "+numPairs);
+		// if (undealtPrimary>3) System.out.println("[ERROR] undealtPrimary invalid: "+undealtPrimary);
+		// if (undealtSecondary>3) System.out.println("[ERROR] undealtSecondary invalid: "+undealtSecondary);
+		// if (undealtStraight>2) System.out.println("[ERROR] undealtStraight invalid: "+undealtStraight);
+		// if (undealtFlush>2) System.out.println("[ERROR] undealtFlush invalid: "+undealtFlush);
 
 		// Build 16-bit abstraction
 		int abstraction = 0;
@@ -398,57 +610,79 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		return abstraction;
 	}
 
-	private int evaluateHandAbstraction(int handAbstraction) {
-		return 0;
+	// Used for debugging
+	private String abstractionToString(int abstraction) {
+		String result = "";
+		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
+		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
+		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
+		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
+		result = (abstraction & 0b001) + " " + result; abstraction = abstraction >> 1;
+		result = (abstraction & 0b001) + " " + result; abstraction = abstraction >> 1;
+		result = (abstraction & 0b001) + " " + result; abstraction = abstraction >> 1;
+		result = (abstraction & 0b011) + " " + result; abstraction = abstraction >> 2;
+		result = (abstraction & 0b111) + " " + result;
+		return result;
 	}
 
 	public void testHandAbstraction() {
+		boolean isAuto = false;
+		boolean hasFailure = false;
 
 		// Manually create test hands
 		System.out.println("=== MANUAL TESTS ===");
-		int[][][] testHands = {
+		int[][][][] testHands = {
 			// Tests for: Num pairs & primary/secondary rank
-			// {{0,0},{0,1},{0,2},{2,3}},
-			// {{0,0},{0,1},{2,2},{2,3}},
-			// {{0,0},{2,1},{2,2},{2,3}},
-			// {{0,0},{1,1},{2,2},{2,3}},
-			// {{0,0},{2,1},{1,2},{2,3}},
-			// {{0,0},{2,1},{2,2},{1,3}},
+			{{{0,0},{0,1},{0,2},{2,3}}, {{0b0010010101110000}}},
+			{{{0,0},{0,1},{2,2},{2,3}}, {{0b0001000010100000}}},
+			{{{0,0},{2,1},{2,2},{2,3}}, {{0b0010010101110000}}},
+			{{{0,0},{1,1},{2,2},{2,3}}, {{0b0100100010000000}}},
+			{{{0,0},{2,1},{1,2},{2,3}}, {{0b0100100110000000}}},
+			{{{0,0},{2,1},{2,2},{1,3}}, {{0b0100100010000000}}},
 
 			// Tests for: 3/4 of a kind
-			// {{0,0},{0,1},{0,2},{0,3}},
-			// {{1,0},{0,1},{0,2},{0,3}},
-			// {{1,0},{0,1},{1,2},{1,3}},
-			// {{1,0},{1,2},{1,3}},
+			{{{0,0},{0,1},{0,2},{0,3}}, {{0b0000001100000000}}},
+			{{{1,0},{0,1},{0,2},{0,3}}, {{0b0010010001110000}}},
+			{{{1,0},{0,1},{1,2},{1,3}}, {{0b0010010101110000}}},
+			{{{1,0},{1,2},{1,3}}, {{0b0000010001000000}}},
 
 			// Tests for: undealt straight
-			// {{0,0}},
-			// {{0,0},{1,1}},
-			// {{0,0},{1,1},{2,2}},
-			// {{0,0},{1,1},{2,2},{3,3}},
-			// {{6,0},{1,1},{2,2},{3,3}},
-			// {{6,0},{2,2},{3,3}},
-			// {{6,0},{9,1}},
-			// {{9,1}},
-			// {{8,1}},
-			// {{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1}},
-			// {{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2}},
-			// {{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{4,3}},
-			// {{6,0},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{5,0},{5,1},{5,2}},
-			// {{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1},{10,2}},
-			// {{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1}},
+			{{{0,0}}, {{0b0010000111001010}}},
+			{{{0,0},{1,1}}, {{0b0100000011111000}}},
+			{{{0,0},{1,1},{2,2}}, {{0b0110000111001000}}},
+			{{{0,0},{1,1},{2,2},{3,3}}, {{0b1000000011001000}}},
+			{{{6,0},{1,1},{2,2},{3,3}}, {{0b1000000111000000}}},
+			{{{6,0},{2,2},{3,3}}, {{0b0110000011001000}}},
+			{{{6,0},{9,1}}, {{0b0100000111111000}}},
+			{{{9,1}}, {{0b0010000011001010}}},
+			{{{8,1}}, {{0b0010000111001010}}},
+			{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1}}, {{0b1000000011001000}}},
+			{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2}}, {{0b1000000111000100}}},
+			{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{4,3}}, {{0b1000000011000000}}},
+			{{{6,0},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{5,0},{5,1},{5,2}}, {{0b0110000111000100}}},
+			{{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1},{10,2}}, {{0b0100000011110100}}},
+			{{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1}}, {{0b0100000111111000}}},
 
 			// Tests for: undealt flush
-			// Todo
+			{{{0,0}}, {{0b0010000011001010}}},
+			{{{0,0},{1,0}}, {{0b0100000111111010}}},
+			{{{0,0},{1,0},{2,0}}, {{0b0110000011001010}}},
+			{{{0,0},{1,0},{2,0},{3,0}}, {{0b1000000111001010}}},
+			{{{0,0},{1,1}}, {{0b0100000011111000}}},
+			{{{0,1},{1,0},{2,0}}, {{0b0110000111001000}}},
+			{{{0,0},{1,0},{2,1},{3,0}}, {{0b1000000011001000}}},
+			{{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0},{12,0}}, {{0b1000000111001000}}},
+			{{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0}}, {{0b1000000011001001}}},
 
 		};
 		for (int i = 0; i < testHands.length; i++) {
+			boolean isRow = (i%2)==0;
 			Card[] hand = new Card[5];
 			Card[] removed = new Card[52];
 			int numRemoved = 0;
 			boolean handEnd = false;
-			for (int j = 0; j<testHands[i].length; j++) {
-				int[] testHand = testHands[i][j];
+			for (int j = 0; j<testHands[i][0].length; j++) {
+				int[] testHand = testHands[i][0][j];
 				if (testHand[0]==-1) {
 					handEnd = true;
 					continue;
@@ -459,22 +693,40 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 				else removed[numRemoved++] = card;
 			}
 			// Test
-			System.out.print("Hand: ");
-			for (Card card : hand) {
-				if (card!=null) System.out.print(card+" ");
-			}
-			if (numRemoved > 0) {
-				System.out.print("minus [");
-				for (int j=0; j<numRemoved; j++) {
-					System.out.print(removed[j]+" ");
+			if (isAuto) {
+				int expected = testHands[i][1][0][0];
+				int result = getHandAbstraction(hand, isRow);
+				if (result != expected) {
+					System.out.println("Test case failed: ["+i+"]");
+					hasFailure = true;
 				}
-				System.out.print("]");
 			}
-			System.out.println();
-			boolean isRow = (i%2)==0;
-			getHandAbstraction(hand, isRow);
+			else {
+				System.out.print("Hand: ");
+				for (Card card : hand) {
+					if (card!=null) System.out.print(card+" ");
+				}
+				if (numRemoved > 0) {
+					System.out.print("minus [");
+					for (int j=0; j<numRemoved; j++) {
+						System.out.print(removed[j]+" ");
+					}
+					System.out.print("]");
+				}
+				System.out.println();
+				int abstraction = getHandAbstraction(hand, isRow);
+				// Print abstraction
+				String abstractionStr = abstractionToString(abstraction);
+				String abstractionBinStr = Integer.toBinaryString(abstraction);
+				String abstractionBinStrPad = ("0000000000000000" + abstractionBinStr).substring(abstractionBinStr.length());
+				System.out.println("Abstraction: "+abstractionStr+" ("+abstractionBinStrPad+")");
+			}
 			// Reset after each hand
 			init();
+		}
+
+		if (isAuto && !hasFailure) {
+			System.out.println("All manual tests passed.");
 		}
 
 		System.out.print("...");
@@ -503,11 +755,12 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 			}
 			System.out.println();
 			boolean isRow = (i%2)==0;
-			getHandAbstraction(hand, isRow);
-
-			// int abstraction = getHandAbstraction(hand, isRow);
-			// String abstractionStr = Integer.toBinaryString(abstraction);
-			// System.out.println("Abstraction: "+("0000000000000000" + abstractionStr).substring(abstractionStr.length()));
+			int abstraction = getHandAbstraction(hand, isRow);
+			// Print abstraction
+			String abstractionStr = abstractionToString(abstraction);
+			String abstractionBinStr = Integer.toBinaryString(abstraction);
+			String abstractionBinStrPad = ("0000000000000000" + abstractionBinStr).substring(abstractionBinStr.length());
+			System.out.println("Abstraction: "+abstractionStr+" ("+abstractionBinStrPad+")");
 		}
 	}
 
@@ -516,14 +769,17 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 	 * @param args (not used)
 	 */
 	public static void main(String[] args) {
-		// PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
-		// System.out.println(system);
-		// new PokerSquares(new HAGMCPlayer(2), system).play(); // play a single game
+		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
+		System.out.println(system);
+		HAGMCPlayer player = new HAGMCPlayer(2);
+		player.isTraining = true;
+		new PokerSquares(player, system).play(); // play a single game
 
 		// === Test hand abstrations ===
-		HAGMCPlayer player = new HAGMCPlayer(2);
-		player.init();
-		player.testHandAbstraction();
+		// HAGMCPlayer player = new HAGMCPlayer(2);
+		// player.isTraining = true;
+		// player.init();
+		// player.testHandAbstraction();
 	}
 
 }
