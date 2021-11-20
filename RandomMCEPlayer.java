@@ -19,6 +19,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	private final int SIZE = 5; // number of rows/columns in square grid
 	private final int NUM_POS = SIZE * SIZE; // number of positions in square grid
 	private final int NUM_CARDS = Card.NUM_CARDS; // number of cards in deck
+	private final int EXPECTISIM_DEPTH = 4; // number of moves INCLUDING FINAL MOVE at the end of the game to be calculated by expectimax.
 	private Random random = new Random(); // pseudorandom number generator for Monte Carlo simulation
 	private int[] plays = new int[NUM_POS]; // positions of plays so far (index 0 through numPlays - 1) recorded as integers using row-major indices.
 	// row-major indices: play (r, c) is recorded as a single integer r * SIZE + c (See http://en.wikipedia.org/wiki/Row-major_order)
@@ -82,14 +83,52 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		// match simDeck to actual play event; in this way, all indices forward from the card contain a list of
 		//   undealt Cards in some permutation.
 		int cardIndex = numPlays;
+		int remainingPlays = NUM_POS - numPlays;
+
 		while (!card.equals(simDeck[cardIndex]))
 			cardIndex++;
 		simDeck[cardIndex] = simDeck[numPlays];
 		simDeck[numPlays] = card;
 
-		if (numPlays < 24) { // not the forced last play
+		// Ben Myles
+		// 2021-11-18
+		if (remainingPlays <= EXPECTISIM_DEPTH) { // Last few turns will be calculated by expectimax.
+			float maxScore = 0;
+			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
+			ArrayList<Integer> bestPlays = new ArrayList<Integer>(); // all plays yielding the maximum average score
+
+			//System.out.println("DEBUG EXPECTIMAX----------------------------");
+			for (int i = 0; i < remainingPlays; i++) { // for each legal play position
+				// Try a play, simulate to the end of the game
+				int play = legalPlayLists[numPlays][i];
+				// System.out.printf("\nTrying play: (%d, %d) = %s\n", play/SIZE, play%SIZE, card);
+				makePlay(card, play / SIZE, play % SIZE);  // play the card at the empty position
+				float expectedScore = expectiSimPlay();
+				// System.out.printf("Expected score: %.1f\n", expectedScore);
+				// Use the expected score of the simulated play to rank the play
+				if (expectedScore >= maxScore) {
+					if (expectedScore > maxScore) {
+						bestPlays.clear();
+					}
+					bestPlays.add(play);
+					maxScore = expectedScore;
+				}
+				undoPlay();
+			}
+			// System.out.println("END DEBUG EXPECTIMAX------------------------");
+			int bestPlay = bestPlays.get(random.nextInt(bestPlays.size())); // choose a best play (breaking ties randomly)
+			// update our list of plays, recording the chosen play in its sequential position; all onward from numPlays are empty positions
+			int bestPlayIndex = numPlays;
+			while (plays[bestPlayIndex] != bestPlay) {
+				bestPlayIndex++;
+			}
+			plays[bestPlayIndex] = plays[numPlays];
+			plays[numPlays] = bestPlay;
+		}
+		// End
+
+		else if (remainingPlays > EXPECTISIM_DEPTH) { // not the last few plays.
 			// compute average time per move evaluation
-			int remainingPlays = NUM_POS - numPlays; // ignores triviality of last play to keep a conservative margin for game completion
 			long millisPerPlay = millisRemaining / remainingPlays; // dividing time evenly with future getPlay() calls
 			long millisPerMoveEval = millisPerPlay / remainingPlays; // dividing time evenly across moves now considered
 			// copy the play positions (row-major indices) that are empty
@@ -128,8 +167,40 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		}
 
 		int[] playPos = {plays[numPlays] / SIZE, plays[numPlays] % SIZE}; // decode it into row and column
+		// System.out.printf("Making play: (%d, %d) = %s\n", plays[numPlays] / SIZE, plays[numPlays] % SIZE, card);
 		makePlay(card, playPos[0], playPos[1]); // make the chosen play (not undoing this time)
 		return playPos; // return the chosen play
+	}
+
+	/*
+	 * From the chosen play, attempt every possible game-end, evaluating them to
+	 * determine the expected score of the chosen play
+	 * @return resulting grid score after playing until end of game
+	*/
+	private float expectiSimPlay() {
+		// Base case: Expected value of a completed game is the score of the game
+		if (numPlays == NUM_POS) {
+			return system.getScore(grid);
+		}
+		int remainingPlays = NUM_POS - numPlays;
+
+		// Loop over the remaining cards in the deck, adding up their expected values
+		int sum = 0;
+		for (int i=numPlays; i<NUM_CARDS; i++) {
+			Card card = simDeck[i];
+
+			// Loop over the legal plays
+			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
+			for (int j=0; j<remainingPlays; j++) {
+				int play = legalPlayLists[numPlays][j];
+				makePlay(card, play / SIZE, play % SIZE);
+				// System.out.printf("%s: %.1f\n", card, expectiSimPlay());
+				sum += expectiSimPlay()/remainingPlays; // Returns the expected value of this card being played. Divide by remaining plays to scale the returned value by the number of moves that it's testing
+				undoPlay();
+			}
+		}
+		// Calculate expected score by averaging the expected score of all the possible cards that could be pulled
+		return ((float)sum)/(NUM_CARDS-numPlays);
 	}
 
 	/**
@@ -217,7 +288,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	 * @param args (not used)
 	 */
 	public static void main(String[] args) {
-		PokerSquaresPointSystem system = PokerSquaresPointSystem.getAmeritishPointSystem();
+		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
 		new PokerSquares(new RandomMCPlayer(2), system).play(); // play a single game
 	}
