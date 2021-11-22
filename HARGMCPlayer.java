@@ -762,6 +762,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
 		HARGMCPlayer player = new HARGMCPlayer(depth);
+		boolean prevIsTraining = player.isTraining;
 		player.isTraining = true;
 		PokerSquares ps = new PokerSquares(player, system);
 		ps.setVerbose(false);
@@ -777,6 +778,7 @@ public class HARGMCPlayer implements PokerSquaresPlayer {
 			player.epsilon *= delta; // decay epsilon after each iteration
 		}
 		System.out.println("Done! Completed "+iterations+" iterations. (final epsilon: "+player.epsilon+")");
+		player.isTraining = prevIsTraining;
 	}
 
 	public static void main(String[] args) {
