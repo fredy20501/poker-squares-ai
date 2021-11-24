@@ -15,7 +15,7 @@ public class PlayerTrainer {
 
         // ! ====== CHANGE THIS TO CHANGE THE PLAYER TO TRAIN/TEST ======
         int depth = 25;
-        HARGMCPlayer.train(depth);
+        HARGMCPlayer.train(depth, 3000);
         PokerSquaresPlayer player = new HARGMCPlayer(depth);
         // ! ============================================================
 

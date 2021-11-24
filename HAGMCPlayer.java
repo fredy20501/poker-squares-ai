@@ -750,7 +750,7 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		}
 	}
 
-	public static void train(int depth) {
+	public static void train(int depth, int iterations) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
 		HAGMCPlayer player = new HAGMCPlayer(depth);
@@ -758,7 +758,6 @@ public class HAGMCPlayer implements PokerSquaresPlayer {
 		PokerSquares ps = new PokerSquares(player, system);
 		ps.setVerbose(false);
 
-		int iterations = 3000; // Number of games played during training
 		for (int i=0; i<iterations; i++) {
 			int score = ps.play();
 			System.out.println(score);

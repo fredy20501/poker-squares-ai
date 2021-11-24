@@ -693,7 +693,7 @@ public class HASRGMCPlayer implements PokerSquaresPlayer {
 		}
 	}
 
-	public static void train(int depth) {
+	public static void train(int depth, int iterations) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
 		HASRGMCPlayer player = new HASRGMCPlayer(depth);
@@ -701,7 +701,6 @@ public class HASRGMCPlayer implements PokerSquaresPlayer {
 		PokerSquares ps = new PokerSquares(player, system);
 		ps.setVerbose(false);
 
-		int iterations = 3000; // Number of games played during training
 		// delta is the exponential decay factor for epsilon (calculated so epsilon reaches 0.1 after all iterations)
 		double delta = Math.exp(Math.log(0.1f/player.epsilon)/iterations);
 		if (delta > 1) throw new RuntimeException("ERROR: delta>1 ("+delta+")");
