@@ -14,7 +14,7 @@ import java.util.Random;
  * Author: Todd W. Neller
  * Modifications by: Michael W. Fleming
  */
-public class RandomMCPlayer implements PokerSquaresPlayer {
+public class RandomMCEPlayer implements PokerSquaresPlayer {
 
 	private final int SIZE = 5; // number of rows/columns in square grid
 	private final int NUM_POS = SIZE * SIZE; // number of positions in square grid
@@ -37,14 +37,14 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to depth 2.
 	 */
-	public RandomMCPlayer() {
+	public RandomMCEPlayer() {
 	}
 
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to a given depth limit.
 	 * @param depthLimit depth limit for random simulated play
 	 */
-	public RandomMCPlayer(int depthLimit) {
+	public RandomMCEPlayer(int depthLimit) {
 		this.depthLimit = depthLimit;
 	}
 
@@ -92,7 +92,10 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 
 		// Ben Myles
 		// 2021-11-18
-		if (remainingPlays <= EXPECTISIM_DEPTH) { // Last few turns will be calculated by expectimax.
+		if (remainingPlays == 1) {
+			// Do nothing to allow forced play
+		}
+		else if (remainingPlays <= EXPECTISIM_DEPTH) { // Last few turns will be calculated by expectimax.
 			float maxScore = 0;
 			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
 			ArrayList<Integer> bestPlays = new ArrayList<Integer>(); // all plays yielding the maximum average score
@@ -280,7 +283,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public String getName() {
-		return "RandomMCPlayerDepth" + depthLimit;
+		return "RandomMCEPlayerDepth" + depthLimit;
 	}
 
 	/**
@@ -290,7 +293,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	public static void main(String[] args) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		new PokerSquares(new RandomMCPlayer(2), system).play(); // play a single game
+		new PokerSquares(new RandomMCEPlayer(25), system).play(); // play a single game
 	}
 
 }
