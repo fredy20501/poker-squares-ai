@@ -36,7 +36,7 @@ public class HARDGMCPlayer implements PokerSquaresPlayer {
 	// New fields (different from RandomMCPlayer)
 	private HashMap<Integer,Float[]> abstractionUtilities; // Hashmap storing the average utility for hand abstractions.
 	private File utilityFile;
-	public float epsilon = 0.1f; // Initial probability of making a random move during Monte Carlo simulation
+	private float epsilon = 0.1f; // Initial probability of making a random move during Monte Carlo simulation
 	private int[][] trainingAbstractions = new int[SIZE * 2][SIZE-1]; // Stores the 4 partial hand abstractions that occur during the game 
 																	  // for each of the 10 rows/cols (only used if training)
 
@@ -51,8 +51,9 @@ public class HARDGMCPlayer implements PokerSquaresPlayer {
 	 * Create a Random Monte Carlo player that simulates random play to a given depth limit.
 	 * @param depthLimit depth limit for random simulated play
 	 */
-	public HARDGMCPlayer(int depthLimit) {
+	public HARDGMCPlayer(int depthLimit, float e) {
 		this.depthLimit = depthLimit;
+		this.epsilon = e;
 	}
 	
 	/* (non-Javadoc)
@@ -322,7 +323,8 @@ public class HARDGMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public String getName() {
-		return "HARDGMCPlayerDepth" + depthLimit;
+		int eps = (int)(epsilon *10);
+		return "HARDGMCPlayerDepth" + depthLimit+"E"+eps;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -761,9 +763,8 @@ public class HARDGMCPlayer implements PokerSquaresPlayer {
 	public static void train(int depth, int iterations, float e) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		HARDGMCPlayer player = new HARDGMCPlayer(depth);
+		HARDGMCPlayer player = new HARDGMCPlayer(depth, e);
 		player.isTraining = true;
-		player.epsilon = e;
 		PokerSquares ps = new PokerSquares(player, system);
 		ps.setVerbose(false);
 
@@ -784,7 +785,7 @@ public class HARDGMCPlayer implements PokerSquaresPlayer {
 		// Play a single game
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		new PokerSquares(new HARDGMCPlayer(25), system).play(); // play a single game
+		new PokerSquares(new HARDGMCPlayer(25, 0.5f), system).play(); // play a single game
 	}
 
 }
