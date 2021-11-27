@@ -207,7 +207,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		if (numCards == 0) utility = 0;
 		else if (numCards == 5) utility = system.getHandScore(hand);
 		else if (numCards == 4) utility = getExpectedValue(hand);
-		else utility = 3; // temp
+		else utility = system.getHandScore(hand);
 		return utility;
 	}
 
