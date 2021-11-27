@@ -226,29 +226,31 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		ArrayList<Integer> rankArrayList = new ArrayList<>(Arrays.asList(rankArr));
 
 		if (suitArrayList.contains(4)){
-			expectedValue += probOfRoyalFlush(hand, suitArrayList.indexOf(4)) * 30; // royal flush
-			expectedValue += probOfSequence(hand, suitArrayList.indexOf(4)) * 30; // straight flush
-			expectedValue += probOfSuit(suitArrayList.indexOf(4)) * 5; // flush
+			expectedValue += probOfRoyalFlush(hand, suitArrayList.indexOf(4)) * system.getHandScore(PokerHand.ROYAL_FLUSH);
+			expectedValue += probOfSequence(hand, suitArrayList.indexOf(4)) * system.getHandScore(PokerHand.STRAIGHT_FLUSH);
+			expectedValue += probOfSuit(suitArrayList.indexOf(4)) * system.getHandScore(PokerHand.FLUSH);
 		}
 		
 		if (rankArrayList.contains(3)) {
-			expectedValue += probOfRank(rankArrayList.indexOf(3)) * 16; // fourOfKind
-			expectedValue += probOfRank(rankArrayList.indexOf(1)) * 10; // find card to complete 2 card rank for full-house 
+			expectedValue += probOfRank(rankArrayList.indexOf(3)) * system.getHandScore(PokerHand.FOUR_OF_A_KIND); 
+			// find card to complete 2 card rank for full-house 
+			expectedValue += probOfRank(rankArrayList.indexOf(1)) * system.getHandScore(PokerHand.FULL_HOUSE);
 		}
 		else if (rankArrayList.contains(2)) {
 			if (Collections.frequency(rankArrayList, 2) == 2) { // check if there's two occurence of 2 
-				expectedValue += probOfRank(rankArrayList.indexOf(2), rankArrayList.lastIndexOf(2)) * 10; // find card for 3 card rank of full-house
+				// find card for 3 card rank of full-house
+				expectedValue += probOfRank(rankArrayList.indexOf(2), rankArrayList.lastIndexOf(2)) * system.getHandScore(PokerHand.FULL_HOUSE); 
 			}
 			else {
-				expectedValue += probOfRank(rankArrayList.lastIndexOf(2)) * 6; // threeOfKind
-				expectedValue += probOfRank(rankArrayList.lastIndexOf(1)) * 3; // twoPair
+				expectedValue += probOfRank(rankArrayList.lastIndexOf(2)) * system.getHandScore(PokerHand.THREE_OF_A_KIND);
+				expectedValue += probOfRank(rankArrayList.lastIndexOf(1)) * system.getHandScore(PokerHand.TWO_PAIR);
 			}
 		}
 		else {
-			expectedValue += probOfRank(rankArrayList) * 1; // onePair
+			expectedValue += probOfRank(rankArrayList) * system.getHandScore(PokerHand.ONE_PAIR);
 		}
 
-		expectedValue += probOfSequence(hand, -1) * 12; // straight flush
+		expectedValue += probOfSequence(hand, -1) * system.getHandScore(PokerHand.STRAIGHT);
 
 		return expectedValue;
 	}
