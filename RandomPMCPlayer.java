@@ -17,7 +17,7 @@ import java.util.Random;
  * Author: Todd W. Neller
  * Modifications by: Michael W. Fleming
  */
-public class RandomMCPlayer implements PokerSquaresPlayer {
+public class RandomPMCPlayer implements PokerSquaresPlayer {
 	
 	private final int SIZE = 5; // number of rows/columns in square grid
 	private final int NUM_POS = SIZE * SIZE; // number of positions in square grid
@@ -39,14 +39,14 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to depth 2.
 	 */
-	public RandomMCPlayer() {
+	public RandomPMCPlayer() {
 	}
 	
 	/**
 	 * Create a Random Monte Carlo player that simulates random play to a given depth limit.
 	 * @param depthLimit depth limit for random simulated play
 	 */
-	public RandomMCPlayer(int depthLimit) {
+	public RandomPMCPlayer(int depthLimit) {
 		this.depthLimit = depthLimit;
 	}
 	
@@ -427,7 +427,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public String getName() {
-		return "RandomMCPlayerDepth" + depthLimit;
+		return "RandomPMCPlayerDepth" + depthLimit;
 	}
 
 	/**
@@ -437,7 +437,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	public static void main(String[] args) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getAmeritishPointSystem();
 		System.out.println(system);
-		new PokerSquares(new RandomMCPlayer(2), system).play(); // play a single game
+		new PokerSquares(new RandomPMCPlayer(2), system).play(); // play a single game
 	}
 
 }
