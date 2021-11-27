@@ -314,7 +314,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 					eligibleCards++;
 				} 
 			}
-			return eligibleCards/ simDeck.length;
+			return eligibleCards/(NUM_CARDS-numPlays);
 		}
 		else {
 			return 0;
@@ -327,7 +327,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			Card card = simDeck[i];
 			if (card.getSuit() == suitIndex) undealtSuitCount++;
 		}
-		return (undealtSuitCount/simDeck.length);
+		return (undealtSuitCount/(NUM_CARDS-numPlays));
 	}
 
 	float probOfRank(int rankIndex) {
@@ -336,7 +336,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			Card card = simDeck[i];
 			if (card.getRank() == rankIndex) undealtRankCount++;
 		}
-		return (undealtRankCount/simDeck.length);
+		return (undealtRankCount/(NUM_CARDS-numPlays));
 	}
 
 	float probOfRank(int rankIndex1, int rankIndex2) {
@@ -346,7 +346,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			if (card.getRank() == rankIndex1) undealtRankCount++;
 			else if(card.getRank() == rankIndex2) undealtRankCount++;
 		}
-		return (undealtRankCount/simDeck.length);
+		return (undealtRankCount/(NUM_CARDS-numPlays));
 	}
 
 	float probOfRank(ArrayList<Integer> rankArrayList) {
@@ -355,7 +355,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			Card card = simDeck[i];
 			if (rankArrayList.contains(card.getRank())) undealtRankCount++;
 		}
-		return (undealtRankCount/simDeck.length);
+		return (undealtRankCount/(NUM_CARDS-numPlays));
 	}
 
 	public void makePlay(Card card, int row, int col) {
