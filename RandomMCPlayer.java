@@ -225,33 +225,58 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		}
 		ArrayList<Integer> suitArrayList = new ArrayList<>(Arrays.asList(suitArr));
 		ArrayList<Integer> rankArrayList = new ArrayList<>(Arrays.asList(rankArr));
+		float [] probArray = new float [9];
 
-		if (suitArrayList.contains(4)){
-			expectedValue += probOfRoyalFlush(hand, suitArrayList.indexOf(4)) * system.getHandScore(PokerHand.ROYAL_FLUSH);
-			expectedValue += probOfSequence(hand, suitArrayList.indexOf(4)) * system.getHandScore(PokerHand.STRAIGHT_FLUSH);
-			expectedValue += probOfSuit(suitArrayList.indexOf(4)) * system.getHandScore(PokerHand.FLUSH);
+		if (suitArrayList.contains(4)) {
+			probArray[0] = (probOfRoyalFlush(hand, suitArrayList.indexOf(4)));
+			probArray[1] = probOfSequence(hand, suitArrayList.indexOf(4)); 
+			probArray[6] = probOfSuit(suitArrayList.indexOf(4)); // flush
 		}
-		
-		if (rankArrayList.contains(3)) {
-			expectedValue += probOfRank(rankArrayList.indexOf(3)) * system.getHandScore(PokerHand.FOUR_OF_A_KIND); 
-			// find card to complete 2 card rank for full-house 
-			expectedValue += probOfRank(rankArrayList.indexOf(1)) * system.getHandScore(PokerHand.FULL_HOUSE);
+		if (rankArrayList.contains(4)) {
+			probArray[2] = 1; // fourOfKind
+		}
+		else if (rankArrayList.contains(3)) {
+			probArray[5] = 1; // threeOfKind
+			probArray[2] = probOfRank(rankArrayList.indexOf(3)); //fourOfKind
+			probArray[4] = probOfRank(rankArrayList.indexOf(1)); // find card to complete 2 card rank for full-house
 		}
 		else if (rankArrayList.contains(2)) {
+			probArray[8] = 1; // 1 pair
 			if (Collections.frequency(rankArrayList, 2) == 2) { // check if there's two occurence of 2 
-				// find card for 3 card rank of full-house
-				expectedValue += probOfRank(rankArrayList.indexOf(2), rankArrayList.lastIndexOf(2)) * system.getHandScore(PokerHand.FULL_HOUSE); 
+				probArray[7] = 1; // 2 pair
+				probArray[4] = probOfRank(rankArrayList.indexOf(2), rankArrayList.lastIndexOf(2)); // find card for 3 card rank of full-house
 			}
 			else {
-				expectedValue += probOfRank(rankArrayList.lastIndexOf(2)) * system.getHandScore(PokerHand.THREE_OF_A_KIND);
-				expectedValue += probOfRank(rankArrayList.lastIndexOf(1)) * system.getHandScore(PokerHand.TWO_PAIR);
+				probArray[5] = probOfRank(rankArrayList.indexOf(2)); //threeOfKind
+				probArray[7] = probOfRank(rankArrayList.indexOf(1), rankArrayList.lastIndexOf(1)); // twoPair
 			}
 		}
 		else {
-			expectedValue += probOfRank(rankArrayList) * system.getHandScore(PokerHand.ONE_PAIR);
+			probArray[8] = probOfRank(rankArrayList); // pair
 		}
+		probArray[3] = probOfSequence(hand, -1); // straight
+		
+		float p;
+		int [] utilityArray = {
+			system.getHandScore(PokerHand.ROYAL_FLUSH),
+			system.getHandScore(PokerHand.STRAIGHT_FLUSH),
+			system.getHandScore(PokerHand.FOUR_OF_A_KIND),
+			system.getHandScore(PokerHand.STRAIGHT),
+			system.getHandScore(PokerHand.FULL_HOUSE),
+			system.getHandScore(PokerHand.THREE_OF_A_KIND),
+			system.getHandScore(PokerHand.FLUSH),
+			system.getHandScore(PokerHand.TWO_PAIR),
+			system.getHandScore(PokerHand.ONE_PAIR),
+		};
 
-		expectedValue += probOfSequence(hand, -1) * system.getHandScore(PokerHand.STRAIGHT);
+		for (int i=0; i < 9; i++) {
+			p = probArray[i];
+
+			for (int j=0; j < i; j++) {
+				 p *= (1-probArray[j]);
+			}
+			expectedValue += p * utilityArray[i];
+		}
 
 		return expectedValue;
 	}
