@@ -1,3 +1,4 @@
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -258,17 +259,21 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	float probOfRoyalFlush(Card[] hand, int suit) {
 		int rankToGet = 0;
 		boolean correctSequence = true;
-		int undealtRoyalCardCount = 0;
-
+		ArrayList<Integer> royalFlush = new ArrayList<Integer>(Arrays.asList(0, 10, 11, 12, 13));
+		
 		for (int i=0; i < 5; i++) {
 			if (hand[i] == null ) {
-				rankToGet = (i==4)? 0: (i+10);
+				rankToGet = royalFlush.get(i);
 			}
-			else if (hand[i].getRank() != ((i==4)? 0: (i+10))){
+			else if (royalFlush.contains(hand[i].getRank())) {
+				royalFlush.remove(hand[i].getRank());
+			}
+			else {
 				correctSequence = false;
 			}
 		}
-
+		
+		int undealtRoyalCardCount = 0;
 		if (correctSequence) { // probability of missing rank with specified suit
 			for (int i=numPlays; i<simDeck.length; i++) {
 				Card card = simDeck[i];
