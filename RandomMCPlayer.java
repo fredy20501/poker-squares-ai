@@ -265,7 +265,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			if (hand[i] != null && royalFlush.contains(hand[i].getRank())) {
 				royalFlush.remove(hand[i].getRank());
 			}
-			else {
+			else if(hand[i] != null) {
 				correctSequence = false;
 			}
 		}
