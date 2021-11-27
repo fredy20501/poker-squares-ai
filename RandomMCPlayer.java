@@ -279,7 +279,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 				Card card = simDeck[i];
 				if (card.getSuit() == suit && card.getRank() == rankToGet) undealtRoyalCardCount++;
 			}
-			return undealtRoyalCardCount;
+			return undealtRoyalCardCount/(NUM_CARDS-numPlays);
 		}
 		else {
 			return 0;
