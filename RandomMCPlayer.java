@@ -1,4 +1,6 @@
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Random;
 
 /**
@@ -138,13 +140,13 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 	 * @param depthLimit - how many simulated random plays to perform
 	 * @return resulting grid score after random MC simulation to given depthLimit
 	 */
-	private int simPlay(int depthLimit) {
+	private float simPlay(int depthLimit) {
 		if (depthLimit == 0) { // with zero depth limit, return current score
-			return system.getScore(grid);
+			return getGridUtility();
 		}
 		else { // up to the non-zero depth limit or to game end, iteratively make the given number of random plays 
-			int score = Integer.MIN_VALUE;
-			int maxScore = Integer.MIN_VALUE;
+			float score = Float.MIN_VALUE;
+			float maxScore = Float.MIN_VALUE;
 			int depth = Math.min(depthLimit, NUM_POS - numPlays); // compute real depth limit, taking into account game end
 			for (int d = 0; d < depth; d++) {
 				// generate a random card draw
@@ -158,7 +160,7 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 				int play = legalPlayLists[numPlays][c2];
 				makePlay(card, play / SIZE, play % SIZE);
 			}
-			score = system.getScore(grid);
+			score = getGridUtility();
 
 			// Undo MC plays.
 			for (int d = 0; d < depth; d++) {
@@ -168,7 +170,192 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 			return score;
 		}
 	}
+
+	private float getGridUtility() {
+		float gridUtility = 0;
+		for (int row = 0; row < SIZE; row++) {
+			gridUtility += getHandUtility(getHandByRow(row), true);
+		}
+		for (int col = 0; col < SIZE; col++) {
+			gridUtility += getHandUtility(getHandByColumn(col), false);
+		}
+		return gridUtility;
+	}
+
+	private Card[] getHandByRow(int row) {
+		Card[] hand = new Card[SIZE];
+		for (int col = 0; col < SIZE; col++) {
+			hand[col] = grid[row][col];
+		}
+		return hand;
+	}
+
+	private Card[] getHandByColumn(int col) {
+		Card[] hand = new Card[SIZE];
+		for (int row = 0; row < SIZE; row++) {
+			hand[row] = grid[row][col];
+		}
+		return hand;
+	}
+
+	private float getHandUtility(Card[] hand, boolean isRow) {
+		float utility = 0;
+		int numCards = 0;
+		for (int i = 0; i < SIZE ; i++) {
+			if (hand[i] != null) numCards++;
+		}
+		if (numCards == 0) utility = 0;
+		else if (numCards == 5) utility = system.getHandScore(hand);
+		else if (numCards == 4) utility = getExpectedValue(hand);
+		else utility = 3; // temp
+		return utility;
+	}
+
+	public float getExpectedValue(Card[] hand) {
+		float expectedValue = 0;
+		Integer [] suitArr  = new Integer[4];
+		Integer [] rankArr  = new Integer[13];
+
+		for (int i = 0; i < 5; i++) {
+			if (hand[i] != null) {
+				suitArr[hand[i].getSuit()]++;
+				rankArr[hand[i].getRank()]++;
+			}
+		}
+		ArrayList<Integer> suitArrayList = new ArrayList<>(Arrays.asList(suitArr));
+		ArrayList<Integer> rankArrayList = new ArrayList<>(Arrays.asList(rankArr));
+
+		if (suitArrayList.contains(4)){
+			expectedValue += probOfRoyalFlush(hand, suitArrayList.indexOf(4)) * 30; // royal flush
+			expectedValue += probOfSequence(hand, suitArrayList.indexOf(4)) * 30; // straight flush
+			expectedValue += probOfSuit(suitArrayList.indexOf(4)) * 5; // flush
+		}
+		
+		if (rankArrayList.contains(3)) {
+			expectedValue += probOfRank(rankArrayList.indexOf(3)) * 16; // fourOfKind
+			expectedValue += probOfRank(rankArrayList.indexOf(1)) * 10; // find card to complete 2 card rank for full-house 
+		}
+		else if (rankArrayList.contains(2)) {
+			if (Collections.frequency(rankArrayList, 2) == 2) { // check if there's two occurence of 2 
+				expectedValue += probOfRank(rankArrayList.indexOf(2), rankArrayList.lastIndexOf(2)) * 10; // find card for 3 card rank of full-house
+			}
+			else {
+				expectedValue += probOfRank(rankArrayList.lastIndexOf(2)) * 6; // threeOfKind
+				expectedValue += probOfRank(rankArrayList.lastIndexOf(1)) * 3; // twoPair
+			}
+		}
+		else {
+			expectedValue += probOfRank(rankArrayList) * 1; // onePair
+		}
+
+		expectedValue += probOfSequence(hand, -1) * 12; // straight flush
+
+		return expectedValue;
+	}
+
+	float probOfRoyalFlush(Card[] hand, int suit) {
+		int rankToGet = 0;
+		boolean correctSequence = true;
+		int undealtRoyalCardCount = 0;
+
+		for (int i=0; i < 5; i++) {
+			if (hand[i] == null ) {
+				rankToGet = (i==4)? 0: (i+10);
+			}
+			else if (hand[i].getRank() != ((i==4)? 0: (i+10))){
+				correctSequence = false;
+			}
+		}
+
+		if (correctSequence) { // probability of missing rank with specified suit
+			for (int i=numPlays; i<simDeck.length; i++) {
+				Card card = simDeck[i];
+				if (card.getSuit() == suit && card.getRank() == rankToGet) undealtRoyalCardCount++;
+			}
+			return undealtRoyalCardCount;
+		}
+		else {
+			return 0;
+		}
+	}
 	
+	float probOfSequence(Card[] hand, int suit) {
+		int rankToGet = 0;
+		int [] updatedHandRanks = new int [5];
+		int eligibleCards = 0;
+
+		for (int i=0; i < 5; i++) {
+			if (hand[i] == null ) {
+				if (i == 0){
+					rankToGet = hand[1].getRank() - 1;
+					updatedHandRanks[i] = rankToGet;
+				}
+				else {
+					rankToGet = hand[i-1].getRank() + 1;
+					updatedHandRanks[i] = rankToGet;
+				}
+				updatedHandRanks[i] =  hand[i].getRank();
+			}
+		}
+
+		boolean correctSequence = true;
+		for (int i=0; i < 4; i++) {
+			if (updatedHandRanks[i] != hand[i+1].getRank() - 1) {
+				correctSequence = false;
+			}
+		}
+
+		if (correctSequence) {
+			for (int i=numPlays; i<simDeck.length; i++) {
+				Card card = simDeck[i];
+				if (card.getRank() == rankToGet && ( suit == -1 || card.getSuit() == suit)) {
+					eligibleCards++;
+				} 
+			}
+			return eligibleCards/ simDeck.length;
+		}
+		else {
+			return 0;
+		}
+	}
+
+	float probOfSuit(int suitIndex) {
+		int undealtSuitCount = 0;
+		for (int i=numPlays; i<simDeck.length; i++) {
+			Card card = simDeck[i];
+			if (card.getSuit() == suitIndex) undealtSuitCount++;
+		}
+		return (undealtSuitCount/simDeck.length);
+	}
+
+	float probOfRank(int rankIndex) {
+		int undealtRankCount = 0;
+		for (int i=numPlays; i<simDeck.length; i++) {
+			Card card = simDeck[i];
+			if (card.getRank() == rankIndex) undealtRankCount++;
+		}
+		return (undealtRankCount/simDeck.length);
+	}
+
+	float probOfRank(int rankIndex1, int rankIndex2) {
+		int undealtRankCount = 0;
+		for (int i=numPlays; i<simDeck.length; i++) {
+			Card card = simDeck[i];
+			if (card.getRank() == rankIndex1) undealtRankCount++;
+			else if(card.getRank() == rankIndex2) undealtRankCount++;
+		}
+		return (undealtRankCount/simDeck.length);
+	}
+
+	float probOfRank(ArrayList<Integer> rankArrayList) {
+		int undealtRankCount = 0;
+		for (int i=numPlays; i<simDeck.length; i++) {
+			Card card = simDeck[i];
+			if (rankArrayList.contains(card.getRank())) undealtRankCount++;
+		}
+		return (undealtRankCount/simDeck.length);
+	}
+
 	public void makePlay(Card card, int row, int col) {
 		// match simDeck to event
 		int cardIndex = numPlays;
