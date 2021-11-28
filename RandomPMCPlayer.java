@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 
 /**
@@ -246,6 +247,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 			if (Collections.frequency(rankArrayList, 2) == 2) { // check if there's two occurence of 2 
 				probArray[7] = 1; // 2 pair
 				probArray[4] = probOfRank(rankArrayList.indexOf(2), rankArrayList.lastIndexOf(2)); // find card for 3 card rank of full-house
+				probArray[5] = probArray[4]; // threeOfKind
 			}
 			else {
 				probArray[5] = probOfRank(rankArrayList.indexOf(2)); //threeOfKind
@@ -254,7 +256,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 		}
 		else {
 			probArray[3] = probOfSequence(hand, -1); // straight
-			probArray[8] = probOfRank(rankArrayList); // pair
+			probArray[8] = probOfRank(rankArrayList); // one pair
 			if (suitArrayList.contains(4)) {
 				probArray[1] = probOfSequence(hand, suitArrayList.indexOf(4)); // straight flush 
 			}
@@ -273,9 +275,20 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 			system.getHandScore(PokerHand.ONE_PAIR),
 		};
 
+		String [] utilityNameArray = {
+			"ROYAL_FLUSH",
+			"STRAIGHT_FLUSH",
+			"FOUR_OF_A_KIND",
+			"STRAIGHT",
+			"FULL_HOUSE",
+			"THREE_OF_A_KIND",
+			"FLUSH",
+			"TWO_PAIR",
+			"ONE_PAIR",
+		};
+
 		for (int i=0; i < 9; i++) {
 			p = probArray[i];
-
 			for (int j=0; j < i; j++) {
 				 p *= (1-probArray[j]);
 			}
@@ -307,7 +320,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 				Card card = simDeck[i];
 				if (card.getSuit() == suit && card.getRank() == rankToGet) undealtRoyalCardCount++;
 			}
-			return undealtRoyalCardCount/(NUM_CARDS-numPlays);
+			return undealtRoyalCardCount/((float)(NUM_CARDS-numPlays));
 		}
 		else {
 			return 0;
@@ -355,7 +368,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 				eligibleCards++;
 			} 
 		}
-		return eligibleCards/(NUM_CARDS-numPlays);
+		return eligibleCards/((float)(NUM_CARDS-numPlays));
 	}
 
 	float probOfSuit(int suitIndex) {
@@ -364,7 +377,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 			Card card = simDeck[i];
 			if (card.getSuit() == suitIndex) undealtSuitCount++;
 		}
-		return (undealtSuitCount/(NUM_CARDS-numPlays));
+		return (undealtSuitCount/((float)(NUM_CARDS-numPlays)));
 	}
 
 	float probOfRank(int rankIndex) {
@@ -373,7 +386,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 			Card card = simDeck[i];
 			if (card.getRank() == rankIndex) undealtRankCount++;
 		}
-		return (undealtRankCount/(NUM_CARDS-numPlays));
+		return (undealtRankCount/((float)(NUM_CARDS-numPlays)));
 	}
 
 	float probOfRank(int rankIndex1, int rankIndex2) {
@@ -383,16 +396,16 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 			if (card.getRank() == rankIndex1) undealtRankCount++;
 			else if(card.getRank() == rankIndex2) undealtRankCount++;
 		}
-		return (undealtRankCount/(NUM_CARDS-numPlays));
+		return (undealtRankCount/((float)(NUM_CARDS-numPlays)));
 	}
 
 	float probOfRank(List<Integer> rankArrayList) {
 		int undealtRankCount = 0;
 		for (int i=numPlays; i<simDeck.length; i++) {
 			Card card = simDeck[i];
-			if (rankArrayList.contains(card.getRank())) undealtRankCount++;
+			if (rankArrayList.get(card.getRank()) > 0) undealtRankCount++;
 		}
-		return (undealtRankCount/(NUM_CARDS-numPlays));
+		return (undealtRankCount/((float)(NUM_CARDS-numPlays)));
 	}
 
 	public void makePlay(Card card, int row, int col) {
@@ -438,12 +451,106 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 		return "RandomPMCPlayerDepth" + depthLimit;
 	}
 
+	public void testExpectValue() {
+		// Manually create test hands
+		System.out.println("=== MANUAL TESTS ===");
+		int[][][] testHands = {
+			// Tests for: Royal flush
+			// {{9,0},{10,0},{11,0},{12,0},{-1},{0,0}},
+			// {{9,0},{10,0},{11,0},{12,0}},
+			// {{11,0},{10,0},{9,0},{12,0}},
+			// {{11,0},{0,0},{9,0},{12,0}},
+			// {{6,0},{7,0},{9,0},{10,0}},
+			// {{12,2},{10,0},{11,0},{8,1}},
+			// {{5,1},{6,1},{8,1},{7,1}},
+			// {{1,0},{2,0},{4,0},{5,0},{-1},{3,0}},
+			// {{1,0},{2,0},{4,0},{5,0},{-1},{3,0},{3,1},{3,2},{3,3}},
+			{{6,0},{6,1},{6,2},{10,0}},
+			{{5,2},{5,0},{11,0},{8,1}},
+			{{5,1},{6,1},{6,2},{5,2}},
+			{{1,0},{6,0},{4,0},{9,0}},
+			{{1,0},{1,1},{1,2},{1,3}},
+			{{1,0},{1,1},{1,2},{9,0},{-1},{1,3}},
+			{{1,0},{1,1},{2,2},{2,3},{-1},{1,2},{1,3}},
+		};
+		for (int i = 0; i < testHands.length; i++) {
+			Card[] hand = new Card[5];
+			Card[] removed = new Card[52];
+			int numRemoved = 0;
+			boolean handEnd = false;
+			for (int j = 0; j<testHands[i].length; j++) {
+				int[] testHand = testHands[i][j];
+				if (testHand[0]==-1) {
+					handEnd = true;
+					continue;
+				}
+				Card card = new Card(testHand[0], testHand[1]);
+				makePlay(card, 0, 0);
+				if (!handEnd) hand[j] = card;
+				else removed[numRemoved++] = card;
+			}
+			// Test
+			System.out.print("Hand: ");
+			for (Card card : hand) {
+				if (card!=null) System.out.print(card+" ");
+			}
+			if (numRemoved > 0) {
+				System.out.print("minus [");
+				for (int j=0; j<numRemoved; j++) {
+					System.out.print(removed[j]+" ");
+				}
+				System.out.print("]");
+			}
+			System.out.println();
+			float ev = getExpectedValue(hand);
+			// Print abstraction
+			System.out.println("EV: "+ev);
+			System.out.println("\n------------------------\n");
+			// Reset after each hand
+			init();
+		}
+
+		System.out.print("...");
+		Scanner sc = new Scanner(System.in);
+		sc.nextLine();
+		sc.close();
+
+		System.out.println("=== RANDOM TESTS ===");
+		// Generate 10 random hands from 1 deck
+		for (int i=0; i<5; i++) {
+			Card[] hand = new Card[5];
+			int numCards = 4;
+			for (int j=0; j<4; j++) {
+				if (j>=numCards) {
+					hand[j] = null;
+				}
+				else {
+					int cardIndex = random.nextInt(NUM_CARDS - numPlays) + numPlays;
+					hand[j] = simDeck[cardIndex];
+					makePlay(hand[j], 0, 0);
+				}
+			}
+			System.out.print("Hand: ");
+			for (Card card : hand) {
+				if (card!=null) System.out.print(card+" ");
+			}
+			System.out.println();
+			float ev = getExpectedValue(hand);
+			// Print abstraction
+			System.out.println("EV: "+ev);
+		}
+	}
+
 	/**
 	 * Demonstrate RandomMCPlay with Ameritish point system.
 	 * @param args (not used)
 	 */
 	public static void main(String[] args) {
-		PokerSquaresPointSystem system = PokerSquaresPointSystem.getAmeritishPointSystem();
+		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
+		// RandomPMCPlayer carter = new RandomPMCPlayer();
+		// carter.init();
+		// carter.setPointSystem(system, 0);
+		// carter.testExpectValue();
 		System.out.println(system);
 		new PokerSquares(new RandomPMCPlayer(2), system).play(); // play a single game
 	}
