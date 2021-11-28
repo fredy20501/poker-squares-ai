@@ -144,7 +144,6 @@ public class RandomMCPlayer implements PokerSquaresPlayer {
 		}
 		else { // up to the non-zero depth limit or to game end, iteratively make the given number of random plays
 			int score = Integer.MIN_VALUE;
-			int maxScore = Integer.MIN_VALUE;
 			int depth = Math.min(depthLimit, NUM_POS - numPlays); // compute real depth limit, taking into account game end
 			for (int d = 0; d < depth; d++) {
 				// generate a random card draw

@@ -8,7 +8,7 @@ import java.io.PrintWriter;
 public class TestRunner {
 
     // Change these values to test a different player & log the results in a different file
-    private static final PokerSquaresPlayer player = new RandomMCPlayer(2);
+    private static final PokerSquaresPlayer player = new RandomPMCPlayer(2);
     private static final File logDir = new File("logs");
     private static final File logFile = new File(logDir.getName()+"/"+player.getName()+".log");
 
