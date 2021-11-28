@@ -2,7 +2,9 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 /**
  * RandomMCPlayer - a simple Monte Carlo implementation of the player interface for PokerSquares.
@@ -214,8 +216,8 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 
 	public float getExpectedValue(Card[] hand) {
 		float expectedValue = 0;
-		Integer [] suitArr  = new Integer[4];
-		Integer [] rankArr  = new Integer[13];
+		int [] suitArr  = new int[4];
+		int [] rankArr  = new int[13];
 
 		for (int i = 0; i < 5; i++) {
 			if (hand[i] != null) {
@@ -223,8 +225,8 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 				rankArr[hand[i].getRank()]++;
 			}
 		}
-		ArrayList<Integer> suitArrayList = new ArrayList<>(Arrays.asList(suitArr));
-		ArrayList<Integer> rankArrayList = new ArrayList<>(Arrays.asList(rankArr));
+		List<Integer> suitArrayList = Arrays.stream(suitArr).boxed().collect(Collectors.toList());
+		List<Integer> rankArrayList = Arrays.stream(rankArr).boxed().collect(Collectors.toList());
 		float [] probArray = new float [9];
 
 		if (suitArrayList.contains(4)) {
@@ -290,7 +292,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 		
 		for (int i=0; i < 5; i++) {
 			if (hand[i] != null && royalFlush.contains(hand[i].getRank())) {
-				royalFlush.remove(hand[i].getRank());
+				royalFlush.remove((Integer) hand[i].getRank());
 			}
 			else if(hand[i] != null) {
 				correctSequence = false;
@@ -384,7 +386,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 		return (undealtRankCount/(NUM_CARDS-numPlays));
 	}
 
-	float probOfRank(ArrayList<Integer> rankArrayList) {
+	float probOfRank(List<Integer> rankArrayList) {
 		int undealtRankCount = 0;
 		for (int i=numPlays; i<simDeck.length; i++) {
 			Card card = simDeck[i];
