@@ -228,8 +228,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 		float [] probArray = new float [9];
 
 		if (suitArrayList.contains(4)) {
-			probArray[0] = (probOfRoyalFlush(hand, suitArrayList.indexOf(4)));
-			probArray[1] = probOfSequence(hand, suitArrayList.indexOf(4)); 
+			probArray[0] = (probOfRoyalFlush(hand, suitArrayList.indexOf(4))); // royal flush
 			probArray[6] = probOfSuit(suitArrayList.indexOf(4)); // flush
 		}
 		if (rankArrayList.contains(4)) {
@@ -252,9 +251,12 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 			}
 		}
 		else {
+			probArray[3] = probOfSequence(hand, -1); // straight
 			probArray[8] = probOfRank(rankArrayList); // pair
-		}
-		probArray[3] = probOfSequence(hand, -1); // straight
+			if (suitArrayList.contains(4)) {
+				probArray[1] = probOfSequence(hand, suitArrayList.indexOf(4)); // straight flush 
+			}
+		}  
 		
 		float p;
 		int [] utilityArray = {
@@ -311,43 +313,47 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 	}
 	
 	float probOfSequence(Card[] hand, int suit) {
-		int rankToGet = 0;
-		int [] updatedHandRanks = new int [5];
-		int eligibleCards = 0;
-
-		for (int i=0; i < 5; i++) {
-			if (hand[i] == null ) {
-				if (i == 0){
-					rankToGet = hand[1].getRank() - 1;
-					updatedHandRanks[i] = rankToGet;
-				}
-				else {
-					rankToGet = hand[i-1].getRank() + 1;
-					updatedHandRanks[i] = rankToGet;
-				}
-				updatedHandRanks[i] =  hand[i].getRank();
+		ArrayList <Integer> rankList = new ArrayList<>();
+		int min = Integer.MAX_VALUE, max = Integer.MIN_VALUE;
+		for (int i=0; i<5; i++) {
+			if (hand[i] != null) {
+				if (hand[i].getRank() > max) max = hand[i].getRank();
+				if (hand[i].getRank() < min) min = hand[i].getRank();
+				rankList.add(hand[i].getRank());
 			}
 		}
-
-		boolean correctSequence = true;
-		for (int i=0; i < 4; i++) {
-			if (updatedHandRanks[i] != hand[i+1].getRank() - 1) {
-				correctSequence = false;
+		// 2 -6, diff is 4, now check each card in middle 3,4,5. check each do I have in the hand, one is missing
+		int diff = max - min;
+		ArrayList<Integer> ranksToGet = new ArrayList<>();
+		if (diff <= 4) {
+			if (diff == 4) { // missing card is between min-max
+				for (int i = min; i < max; i++) {
+					if (!rankList.contains(i)) {
+						ranksToGet.add(i);
+					}
+				}				
 			}
-		}
-
-		if (correctSequence) {
-			for (int i=numPlays; i<simDeck.length; i++) {
-				Card card = simDeck[i];
-				if (card.getRank() == rankToGet && ( suit == -1 || card.getSuit() == suit)) {
-					eligibleCards++;
-				} 
+			else {
+				if (max != 12) {
+					ranksToGet.add(max + 1);
+				}
+				if (min != 0) {
+					ranksToGet.add(min - 1);
+				}
 			}
-			return eligibleCards/(NUM_CARDS-numPlays);
 		}
 		else {
 			return 0;
 		}
+
+		int eligibleCards = 0;
+		for (int i=numPlays; i<simDeck.length; i++) {
+			Card card = simDeck[i];
+			if (ranksToGet.contains(card.getRank())  && ( suit == -1 || card.getSuit() == suit)) {
+				eligibleCards++;
+			} 
+		}
+		return eligibleCards/(NUM_CARDS-numPlays);
 	}
 
 	float probOfSuit(int suitIndex) {
