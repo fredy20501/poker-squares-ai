@@ -1,4 +1,3 @@
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -150,7 +149,6 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 		}
 		else { // up to the non-zero depth limit or to game end, iteratively make the given number of random plays 
 			float score = Float.MIN_VALUE;
-			float maxScore = Float.MIN_VALUE;
 			int depth = Math.min(depthLimit, NUM_POS - numPlays); // compute real depth limit, taking into account game end
 			for (int d = 0; d < depth; d++) {
 				// generate a random card draw
@@ -275,17 +273,17 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 			system.getHandScore(PokerHand.ONE_PAIR),
 		};
 
-		String [] utilityNameArray = {
-			"ROYAL_FLUSH",
-			"STRAIGHT_FLUSH",
-			"FOUR_OF_A_KIND",
-			"STRAIGHT",
-			"FULL_HOUSE",
-			"THREE_OF_A_KIND",
-			"FLUSH",
-			"TWO_PAIR",
-			"ONE_PAIR",
-		};
+		// String [] utilityNameArray = {
+		// 	"ROYAL_FLUSH",
+		// 	"STRAIGHT_FLUSH",
+		// 	"FOUR_OF_A_KIND",
+		// 	"STRAIGHT",
+		// 	"FULL_HOUSE",
+		// 	"THREE_OF_A_KIND",
+		// 	"FLUSH",
+		// 	"TWO_PAIR",
+		// 	"ONE_PAIR",
+		// };
 
 		for (int i=0; i < 9; i++) {
 			p = probArray[i];
@@ -337,7 +335,7 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 				rankList.add(hand[i].getRank());
 			}
 		}
-		// 2 -6, diff is 4, now check each card in middle 3,4,5. check each do I have in the hand, one is missing
+
 		int diff = max - min;
 		ArrayList<Integer> ranksToGet = new ArrayList<>();
 		if (diff <= 4) {
@@ -455,16 +453,20 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 		// Manually create test hands
 		System.out.println("=== MANUAL TESTS ===");
 		int[][][] testHands = {
-			// Tests for: Royal flush
+			// Tests for: probOfRoyalFlush & probOfSuit
 			// {{9,0},{10,0},{11,0},{12,0},{-1},{0,0}},
 			// {{9,0},{10,0},{11,0},{12,0}},
 			// {{11,0},{10,0},{9,0},{12,0}},
 			// {{11,0},{0,0},{9,0},{12,0}},
+
+			// Tests for: probOfSequence
 			// {{6,0},{7,0},{9,0},{10,0}},
 			// {{12,2},{10,0},{11,0},{8,1}},
 			// {{5,1},{6,1},{8,1},{7,1}},
 			// {{1,0},{2,0},{4,0},{5,0},{-1},{3,0}},
 			// {{1,0},{2,0},{4,0},{5,0},{-1},{3,0},{3,1},{3,2},{3,3}},
+
+			// Tests for: probOfRank
 			{{6,0},{6,1},{6,2},{10,0}},
 			{{5,2},{5,0},{11,0},{8,1}},
 			{{5,1},{6,1},{6,2},{5,2}},
