@@ -449,99 +449,99 @@ public class RandomPMCPlayer implements PokerSquaresPlayer {
 		return "RandomPMCPlayerDepth" + depthLimit;
 	}
 
-	public void testExpectValue() {
-		// Manually create test hands
-		System.out.println("=== MANUAL TESTS ===");
-		int[][][] testHands = {
-			// Tests for: probOfRoyalFlush & probOfSuit
-			// {{9,0},{10,0},{11,0},{12,0},{-1},{0,0}},
-			// {{9,0},{10,0},{11,0},{12,0}},
-			// {{11,0},{10,0},{9,0},{12,0}},
-			// {{11,0},{0,0},{9,0},{12,0}},
+	// public void testExpectValue() {
+	// 	// Manually create test hands
+	// 	System.out.println("=== MANUAL TESTS ===");
+	// 	int[][][] testHands = {
+	// 		// Tests for: probOfRoyalFlush & probOfSuit
+	// 		// {{9,0},{10,0},{11,0},{12,0},{-1},{0,0}},
+	// 		// {{9,0},{10,0},{11,0},{12,0}},
+	// 		// {{11,0},{10,0},{9,0},{12,0}},
+	// 		// {{11,0},{0,0},{9,0},{12,0}},
 
-			// Tests for: probOfSequence
-			// {{6,0},{7,0},{9,0},{10,0}},
-			// {{12,2},{10,0},{11,0},{8,1}},
-			// {{5,1},{6,1},{8,1},{7,1}},
-			// {{1,0},{2,0},{4,0},{5,0},{-1},{3,0}},
-			// {{1,0},{2,0},{4,0},{5,0},{-1},{3,0},{3,1},{3,2},{3,3}},
+	// 		// Tests for: probOfSequence
+	// 		// {{6,0},{7,0},{9,0},{10,0}},
+	// 		// {{12,2},{10,0},{11,0},{8,1}},
+	// 		// {{5,1},{6,1},{8,1},{7,1}},
+	// 		// {{1,0},{2,0},{4,0},{5,0},{-1},{3,0}},
+	// 		// {{1,0},{2,0},{4,0},{5,0},{-1},{3,0},{3,1},{3,2},{3,3}},
 
-			// Tests for: probOfRank
-			{{6,0},{6,1},{6,2},{10,0}},
-			{{5,2},{5,0},{11,0},{8,1}},
-			{{5,1},{6,1},{6,2},{5,2}},
-			{{1,0},{6,0},{4,0},{9,0}},
-			{{1,0},{1,1},{1,2},{1,3}},
-			{{1,0},{1,1},{1,2},{9,0},{-1},{1,3}},
-			{{1,0},{1,1},{2,2},{2,3},{-1},{1,2},{1,3}},
-		};
-		for (int i = 0; i < testHands.length; i++) {
-			Card[] hand = new Card[5];
-			Card[] removed = new Card[52];
-			int numRemoved = 0;
-			boolean handEnd = false;
-			for (int j = 0; j<testHands[i].length; j++) {
-				int[] testHand = testHands[i][j];
-				if (testHand[0]==-1) {
-					handEnd = true;
-					continue;
-				}
-				Card card = new Card(testHand[0], testHand[1]);
-				makePlay(card, 0, 0);
-				if (!handEnd) hand[j] = card;
-				else removed[numRemoved++] = card;
-			}
-			// Test
-			System.out.print("Hand: ");
-			for (Card card : hand) {
-				if (card!=null) System.out.print(card+" ");
-			}
-			if (numRemoved > 0) {
-				System.out.print("minus [");
-				for (int j=0; j<numRemoved; j++) {
-					System.out.print(removed[j]+" ");
-				}
-				System.out.print("]");
-			}
-			System.out.println();
-			float ev = getExpectedValue(hand);
-			// Print abstraction
-			System.out.println("EV: "+ev);
-			System.out.println("\n------------------------\n");
-			// Reset after each hand
-			init();
-		}
+	// 		// Tests for: probOfRank
+	// 		{{6,0},{6,1},{6,2},{10,0}},
+	// 		{{5,2},{5,0},{11,0},{8,1}},
+	// 		{{5,1},{6,1},{6,2},{5,2}},
+	// 		{{1,0},{6,0},{4,0},{9,0}},
+	// 		{{1,0},{1,1},{1,2},{1,3}},
+	// 		{{1,0},{1,1},{1,2},{9,0},{-1},{1,3}},
+	// 		{{1,0},{1,1},{2,2},{2,3},{-1},{1,2},{1,3}},
+	// 	};
+	// 	for (int i = 0; i < testHands.length; i++) {
+	// 		Card[] hand = new Card[5];
+	// 		Card[] removed = new Card[52];
+	// 		int numRemoved = 0;
+	// 		boolean handEnd = false;
+	// 		for (int j = 0; j<testHands[i].length; j++) {
+	// 			int[] testHand = testHands[i][j];
+	// 			if (testHand[0]==-1) {
+	// 				handEnd = true;
+	// 				continue;
+	// 			}
+	// 			Card card = new Card(testHand[0], testHand[1]);
+	// 			makePlay(card, 0, 0);
+	// 			if (!handEnd) hand[j] = card;
+	// 			else removed[numRemoved++] = card;
+	// 		}
+	// 		// Test
+	// 		System.out.print("Hand: ");
+	// 		for (Card card : hand) {
+	// 			if (card!=null) System.out.print(card+" ");
+	// 		}
+	// 		if (numRemoved > 0) {
+	// 			System.out.print("minus [");
+	// 			for (int j=0; j<numRemoved; j++) {
+	// 				System.out.print(removed[j]+" ");
+	// 			}
+	// 			System.out.print("]");
+	// 		}
+	// 		System.out.println();
+	// 		float ev = getExpectedValue(hand);
+	// 		// Print abstraction
+	// 		System.out.println("EV: "+ev);
+	// 		System.out.println("\n------------------------\n");
+	// 		// Reset after each hand
+	// 		init();
+	// 	}
 
-		System.out.print("...");
-		Scanner sc = new Scanner(System.in);
-		sc.nextLine();
-		sc.close();
+	// 	System.out.print("...");
+	// 	Scanner sc = new Scanner(System.in);
+	// 	sc.nextLine();
+	// 	sc.close();
 
-		System.out.println("=== RANDOM TESTS ===");
-		// Generate 10 random hands from 1 deck
-		for (int i=0; i<5; i++) {
-			Card[] hand = new Card[5];
-			int numCards = 4;
-			for (int j=0; j<4; j++) {
-				if (j>=numCards) {
-					hand[j] = null;
-				}
-				else {
-					int cardIndex = random.nextInt(NUM_CARDS - numPlays) + numPlays;
-					hand[j] = simDeck[cardIndex];
-					makePlay(hand[j], 0, 0);
-				}
-			}
-			System.out.print("Hand: ");
-			for (Card card : hand) {
-				if (card!=null) System.out.print(card+" ");
-			}
-			System.out.println();
-			float ev = getExpectedValue(hand);
-			// Print abstraction
-			System.out.println("EV: "+ev);
-		}
-	}
+	// 	System.out.println("=== RANDOM TESTS ===");
+	// 	// Generate 10 random hands from 1 deck
+	// 	for (int i=0; i<5; i++) {
+	// 		Card[] hand = new Card[5];
+	// 		int numCards = 4;
+	// 		for (int j=0; j<4; j++) {
+	// 			if (j>=numCards) {
+	// 				hand[j] = null;
+	// 			}
+	// 			else {
+	// 				int cardIndex = random.nextInt(NUM_CARDS - numPlays) + numPlays;
+	// 				hand[j] = simDeck[cardIndex];
+	// 				makePlay(hand[j], 0, 0);
+	// 			}
+	// 		}
+	// 		System.out.print("Hand: ");
+	// 		for (Card card : hand) {
+	// 			if (card!=null) System.out.print(card+" ");
+	// 		}
+	// 		System.out.println();
+	// 		float ev = getExpectedValue(hand);
+	// 		// Print abstraction
+	// 		System.out.println("EV: "+ev);
+	// 	}
+	// }
 
 	/**
 	 * Demonstrate RandomMCPlay with Ameritish point system.

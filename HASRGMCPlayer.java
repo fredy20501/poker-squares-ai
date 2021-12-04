@@ -554,144 +554,144 @@ public class HASRGMCPlayer implements PokerSquaresPlayer {
 		return result;
 	}
 
-	public void testHandAbstraction() {
-		boolean isAuto = true;
-		boolean hasFailure = false;
+	// public void testHandAbstraction() {
+	// 	boolean isAuto = true;
+	// 	boolean hasFailure = false;
 
-		// Manually create test hands
-		System.out.println("=== MANUAL TESTS ===");
-		int[][][][] testHands = {
-			// // Tests for: Num pairs & primary/secondary rank
-			// {{{0,0},{0,1},{0,2},{2,3}}, {{0b0010010101110000}}},
-			// {{{0,0},{0,1},{2,2},{2,3}}, {{0b0001000010100000}}},
-			// {{{0,0},{2,1},{2,2},{2,3}}, {{0b0010010101110000}}},
-			// {{{0,0},{1,1},{2,2},{2,3}}, {{0b0100100010000000}}},
-			// {{{0,0},{2,1},{1,2},{2,3}}, {{0b0100100110000000}}},
-			// {{{0,0},{2,1},{2,2},{1,3}}, {{0b0100100010000000}}},
+	// 	// Manually create test hands
+	// 	System.out.println("=== MANUAL TESTS ===");
+	// 	int[][][][] testHands = {
+	// 		// // Tests for: Num pairs & primary/secondary rank
+	// 		// {{{0,0},{0,1},{0,2},{2,3}}, {{0b0010010101110000}}},
+	// 		// {{{0,0},{0,1},{2,2},{2,3}}, {{0b0001000010100000}}},
+	// 		// {{{0,0},{2,1},{2,2},{2,3}}, {{0b0010010101110000}}},
+	// 		// {{{0,0},{1,1},{2,2},{2,3}}, {{0b0100100010000000}}},
+	// 		// {{{0,0},{2,1},{1,2},{2,3}}, {{0b0100100110000000}}},
+	// 		// {{{0,0},{2,1},{2,2},{1,3}}, {{0b0100100010000000}}},
 
-			// // Tests for: 3/4 of a kind
-			// {{{0,0},{0,1},{0,2},{0,3}}, {{0b0000001100000000}}},
-			// {{{1,0},{0,1},{0,2},{0,3}}, {{0b0010010001110000}}},
-			// {{{1,0},{0,1},{1,2},{1,3}}, {{0b0010010101110000}}},
-			// {{{1,0},{1,2},{1,3}}, {{0b0000010001000000}}},
+	// 		// // Tests for: 3/4 of a kind
+	// 		// {{{0,0},{0,1},{0,2},{0,3}}, {{0b0000001100000000}}},
+	// 		// {{{1,0},{0,1},{0,2},{0,3}}, {{0b0010010001110000}}},
+	// 		// {{{1,0},{0,1},{1,2},{1,3}}, {{0b0010010101110000}}},
+	// 		// {{{1,0},{1,2},{1,3}}, {{0b0000010001000000}}},
 
-			// // Tests for: undealt straight
-			// {{{0,0}}, {{0b0010000111001010}}},
-			// {{{0,0},{1,1}}, {{0b0100000011111000}}},
-			// {{{0,0},{1,1},{2,2}}, {{0b0110000111001000}}},
-			// {{{0,0},{1,1},{2,2},{3,3}}, {{0b1000000011001000}}},
-			// {{{6,0},{1,1},{2,2},{3,3}}, {{0b1000000111000000}}},
-			// {{{6,0},{2,2},{3,3}}, {{0b0110000011001000}}},
-			// {{{6,0},{9,1}}, {{0b0100000111111000}}},
-			// {{{9,1}}, {{0b0010000011001010}}},
-			// {{{8,1}}, {{0b0010000111001010}}},
-			// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1}}, {{0b1000000011001000}}},
-			// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2}}, {{0b1000000111000100}}},
-			// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{4,3}}, {{0b1000000011000000}}},
-			// {{{6,0},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{5,0},{5,1},{5,2}}, {{0b0110000111000100}}},
-			// {{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1},{10,2}}, {{0b0100000011110100}}},
-			// {{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1}}, {{0b0100000111111000}}},
+	// 		// // Tests for: undealt straight
+	// 		// {{{0,0}}, {{0b0010000111001010}}},
+	// 		// {{{0,0},{1,1}}, {{0b0100000011111000}}},
+	// 		// {{{0,0},{1,1},{2,2}}, {{0b0110000111001000}}},
+	// 		// {{{0,0},{1,1},{2,2},{3,3}}, {{0b1000000011001000}}},
+	// 		// {{{6,0},{1,1},{2,2},{3,3}}, {{0b1000000111000000}}},
+	// 		// {{{6,0},{2,2},{3,3}}, {{0b0110000011001000}}},
+	// 		// {{{6,0},{9,1}}, {{0b0100000111111000}}},
+	// 		// {{{9,1}}, {{0b0010000011001010}}},
+	// 		// {{{8,1}}, {{0b0010000111001010}}},
+	// 		// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1}}, {{0b1000000011001000}}},
+	// 		// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2}}, {{0b1000000111000100}}},
+	// 		// {{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{4,3}}, {{0b1000000011000000}}},
+	// 		// {{{6,0},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{5,0},{5,1},{5,2}}, {{0b0110000111000100}}},
+	// 		// {{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1},{10,2}}, {{0b0100000011110100}}},
+	// 		// {{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1}}, {{0b0100000111111000}}},
 
-			// // Tests for: undealt flush
-			// {{{0,0}}, {{0b0010000011001010}}},
-			// {{{0,0},{1,0}}, {{0b0100000111111010}}},
-			// {{{0,0},{1,0},{2,0}}, {{0b0110000011001010}}},
-			// {{{0,0},{1,0},{2,0},{3,0}}, {{0b1000000111001010}}},
-			// {{{0,0},{1,1}}, {{0b0100000011111000}}},
-			// {{{0,1},{1,0},{2,0}}, {{0b0110000111001000}}},
-			// {{{0,0},{1,0},{2,1},{3,0}}, {{0b1000000011001000}}},
-			// {{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0},{12,0}}, {{0b1000000111001000}}},
-			// {{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0}}, {{0b1000000011001001}}},
+	// 		// // Tests for: undealt flush
+	// 		// {{{0,0}}, {{0b0010000011001010}}},
+	// 		// {{{0,0},{1,0}}, {{0b0100000111111010}}},
+	// 		// {{{0,0},{1,0},{2,0}}, {{0b0110000011001010}}},
+	// 		// {{{0,0},{1,0},{2,0},{3,0}}, {{0b1000000111001010}}},
+	// 		// {{{0,0},{1,1}}, {{0b0100000011111000}}},
+	// 		// {{{0,1},{1,0},{2,0}}, {{0b0110000111001000}}},
+	// 		// {{{0,0},{1,0},{2,1},{3,0}}, {{0b1000000011001000}}},
+	// 		// {{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0},{12,0}}, {{0b1000000111001000}}},
+	// 		// {{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0}}, {{0b1000000011001001}}},
 
-		};
-		for (int i = 0; i < testHands.length; i++) {
-			boolean isRow = (i%2)==0;
-			Card[] hand = new Card[5];
-			Card[] removed = new Card[52];
-			int numRemoved = 0;
-			boolean handEnd = false;
-			for (int j = 0; j<testHands[i][0].length; j++) {
-				int[] testHand = testHands[i][0][j];
-				if (testHand[0]==-1) {
-					handEnd = true;
-					continue;
-				}
-				Card card = new Card(testHand[0], testHand[1]);
-				makePlay(card, 0, 0);
-				if (!handEnd) hand[j] = card;
-				else removed[numRemoved++] = card;
-			}
-			// Test
-			if (isAuto) {
-				int expected = testHands[i][1][0][0];
-				int result = getHandAbstraction(hand, isRow);
-				if (result != expected) {
-					System.out.println("Test case failed: ["+i+"]");
-					hasFailure = true;
-				}
-			}
-			else {
-				System.out.print("Hand: ");
-				for (Card card : hand) {
-					if (card!=null) System.out.print(card+" ");
-				}
-				if (numRemoved > 0) {
-					System.out.print("minus [");
-					for (int j=0; j<numRemoved; j++) {
-						System.out.print(removed[j]+" ");
-					}
-					System.out.print("]");
-				}
-				System.out.println();
-				int abstraction = getHandAbstraction(hand, isRow);
-				// Print abstraction
-				String abstractionStr = abstractionToString(abstraction);
-				String abstractionBinStr = Integer.toBinaryString(abstraction);
-				String abstractionBinStrPad = ("0000000000000000" + abstractionBinStr).substring(abstractionBinStr.length());
-				System.out.println("Abstraction: "+abstractionStr+" ("+abstractionBinStrPad+")");
-			}
-			// Reset after each hand
-			init();
-		}
+	// 	};
+	// 	for (int i = 0; i < testHands.length; i++) {
+	// 		boolean isRow = (i%2)==0;
+	// 		Card[] hand = new Card[5];
+	// 		Card[] removed = new Card[52];
+	// 		int numRemoved = 0;
+	// 		boolean handEnd = false;
+	// 		for (int j = 0; j<testHands[i][0].length; j++) {
+	// 			int[] testHand = testHands[i][0][j];
+	// 			if (testHand[0]==-1) {
+	// 				handEnd = true;
+	// 				continue;
+	// 			}
+	// 			Card card = new Card(testHand[0], testHand[1]);
+	// 			makePlay(card, 0, 0);
+	// 			if (!handEnd) hand[j] = card;
+	// 			else removed[numRemoved++] = card;
+	// 		}
+	// 		// Test
+	// 		if (isAuto) {
+	// 			int expected = testHands[i][1][0][0];
+	// 			int result = getHandAbstraction(hand, isRow);
+	// 			if (result != expected) {
+	// 				System.out.println("Test case failed: ["+i+"]");
+	// 				hasFailure = true;
+	// 			}
+	// 		}
+	// 		else {
+	// 			System.out.print("Hand: ");
+	// 			for (Card card : hand) {
+	// 				if (card!=null) System.out.print(card+" ");
+	// 			}
+	// 			if (numRemoved > 0) {
+	// 				System.out.print("minus [");
+	// 				for (int j=0; j<numRemoved; j++) {
+	// 					System.out.print(removed[j]+" ");
+	// 				}
+	// 				System.out.print("]");
+	// 			}
+	// 			System.out.println();
+	// 			int abstraction = getHandAbstraction(hand, isRow);
+	// 			// Print abstraction
+	// 			String abstractionStr = abstractionToString(abstraction);
+	// 			String abstractionBinStr = Integer.toBinaryString(abstraction);
+	// 			String abstractionBinStrPad = ("0000000000000000" + abstractionBinStr).substring(abstractionBinStr.length());
+	// 			System.out.println("Abstraction: "+abstractionStr+" ("+abstractionBinStrPad+")");
+	// 		}
+	// 		// Reset after each hand
+	// 		init();
+	// 	}
 
-		if (isAuto && !hasFailure) {
-			System.out.println("All manual tests passed.");
-		}
+	// 	if (isAuto && !hasFailure) {
+	// 		System.out.println("All manual tests passed.");
+	// 	}
 
-		System.out.print("...");
-		Scanner sc = new Scanner(System.in);
-		sc.nextLine();
-		sc.close();
+	// 	System.out.print("...");
+	// 	Scanner sc = new Scanner(System.in);
+	// 	sc.nextLine();
+	// 	sc.close();
 
-		System.out.println("=== RANDOM TESTS ===");
-		// Generate 10 random hands from 1 deck
-		for (int i=0; i<5; i++) {
-			Card[] hand = new Card[5];
-			int numCards = random.nextInt(4)+1;
-			for (int j=0; j<4; j++) {
-				if (j>=numCards) {
-					hand[j] = null;
-				}
-				else {
-					int cardIndex = random.nextInt(NUM_CARDS - numPlays) + numPlays;
-					hand[j] = simDeck[cardIndex];
-					makePlay(hand[j], 0, 0);
-				}
-			}
-			System.out.print("Hand: ");
-			for (Card card : hand) {
-				if (card!=null) System.out.print(card+" ");
-			}
-			System.out.println();
-			boolean isRow = (i%2)==0;
-			int abstraction = getHandAbstraction(hand, isRow);
-			// Print abstraction
-			String abstractionStr = abstractionToString(abstraction);
-			String abstractionBinStr = Integer.toBinaryString(abstraction);
-			String abstractionBinStrPad = ("0000000000000000" + abstractionBinStr).substring(abstractionBinStr.length());
-			System.out.println("Abstraction: "+abstractionStr+" ("+abstractionBinStrPad+")");
-		}
-	}
+	// 	System.out.println("=== RANDOM TESTS ===");
+	// 	// Generate 10 random hands from 1 deck
+	// 	for (int i=0; i<5; i++) {
+	// 		Card[] hand = new Card[5];
+	// 		int numCards = random.nextInt(4)+1;
+	// 		for (int j=0; j<4; j++) {
+	// 			if (j>=numCards) {
+	// 				hand[j] = null;
+	// 			}
+	// 			else {
+	// 				int cardIndex = random.nextInt(NUM_CARDS - numPlays) + numPlays;
+	// 				hand[j] = simDeck[cardIndex];
+	// 				makePlay(hand[j], 0, 0);
+	// 			}
+	// 		}
+	// 		System.out.print("Hand: ");
+	// 		for (Card card : hand) {
+	// 			if (card!=null) System.out.print(card+" ");
+	// 		}
+	// 		System.out.println();
+	// 		boolean isRow = (i%2)==0;
+	// 		int abstraction = getHandAbstraction(hand, isRow);
+	// 		// Print abstraction
+	// 		String abstractionStr = abstractionToString(abstraction);
+	// 		String abstractionBinStr = Integer.toBinaryString(abstraction);
+	// 		String abstractionBinStrPad = ("0000000000000000" + abstractionBinStr).substring(abstractionBinStr.length());
+	// 		System.out.println("Abstraction: "+abstractionStr+" ("+abstractionBinStrPad+")");
+	// 	}
+	// }
 
 	public static void train(int depth, int iterations) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
@@ -699,7 +699,7 @@ public class HASRGMCPlayer implements PokerSquaresPlayer {
 		HASRGMCPlayer player = new HASRGMCPlayer(depth);
 		player.isTraining = true;
 		PokerSquares ps = new PokerSquares(player, system);
-		ps.setVerbose(false);
+		// ps.setVerbose(false);
 
 		// delta is the exponential decay factor for epsilon (calculated so epsilon reaches 0.1 after all iterations)
 		double delta = Math.exp(Math.log(0.1f/player.epsilon)/iterations);
