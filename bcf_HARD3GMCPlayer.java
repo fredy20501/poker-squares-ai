@@ -625,10 +625,10 @@ public class bcf_HARD3GMCPlayer implements PokerSquaresPlayer {
 	}
 
 	public static void main(String[] args) {
-		// Play a single game
+		// Play 20 games
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		new PokerSquares(new bcf_HARD3GMCPlayer(), system).play(); // play a single game
+		PokerSquares ps = new PokerSquares(new bcf_HARD3GMCPlayer(), system);
+		ps.playSequence(20, 0, true);
 	}
-
 }
