@@ -23,7 +23,7 @@ public class PlayerTrainer {
         PokerSquaresPointSystem.setSeed(0L);
         PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
         PokerSquares ps = new PokerSquares(player, system);
-        ps.setVerbose(false);
+        // ps.setVerbose(false);
 
         // Log file setup
         logFile = new File(logDir.getName()+"/"+player.getName()+".log");

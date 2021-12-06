@@ -1,6 +1,5 @@
 import java.util.ArrayList;
 import java.util.Random;
-import java.util.Scanner;
 import java.util.HashMap;
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,12 +8,18 @@ import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 
 /**
- * (Hand Abstraction Reinforcement Greedy Expectimax Monte Carlo Player)
- * HARGEMCPlayer - a Monte Carlo implementation of the player interface for PokerSquares using an 
+ * (Hand Abstraction Reinforcement noDecay 0.3e Greedy Monte Carlo Player)
+ * bcf_HARD3GMCPlayer - a Monte Carlo implementation of the player interface for PokerSquares using an 
  * optimized greedy search as a playout policy, hand abstractions for partial evaluation, 
- * and reinforcement learning to learn hand abstraction values. It also uses expectimax for the last few turns.
+ * and reinforcement learning to learn hand abstraction values with an epsilon-greedy policy where 
+ * epsilon is set to 0.3 (constant epsilon).
+ * 
+ * Authors: 
+ * 	Ben Myles
+ * 	Carter MacLennan
+ * 	Frederic Verret
  */
-public class HARGEMCPlayer implements PokerSquaresPlayer {
+public class bcf_HARD3GMCPlayer implements PokerSquaresPlayer {
 	
 	private final int SIZE = 5; // number of rows/columns in square grid
 	private final int NUM_POS = SIZE * SIZE; // number of positions in square grid
@@ -25,7 +30,7 @@ public class HARGEMCPlayer implements PokerSquaresPlayer {
 											// From plays index [numPlays] onward, we maintain a list of yet unplayed positions.
 	private int numPlays = 0; // number of Cards played into the grid so far
 	private PokerSquaresPointSystem system; // point system
-	private int depthLimit = 25; // default depth limit for Monte Carlo (MC) play
+	private int depthLimit = 13; // depth limit for Monte Carlo (MC) play
 	private Card[][] grid = new Card[SIZE][SIZE]; // grid with Card objects or null (for empty positions)
 	private Card[] simDeck = Card.getAllCards(); // a list of all Cards. As we learn the index of cards in the play deck,
 	                                             // we swap each dealt card to its correct index.  Thus, from index numPlays 
@@ -34,27 +39,17 @@ public class HARGEMCPlayer implements PokerSquaresPlayer {
 	// (This avoids constant allocation/deallocation of such lists during the selections of MC simulations.)
 
 	// New fields (different from RandomMCPlayer)
-	private final int EXPECTISIM_DEPTH = 4; // number of moves INCLUDING FINAL MOVE at the end of the game to be calculated by expectimax.
 	private HashMap<Integer,Float[]> abstractionUtilities; // Hashmap storing the average utility for hand abstractions.
 	private File utilityFile;
-	public float epsilon = 0.5f; // Initial probability of making a random move during Monte Carlo simulation
+	private float epsilon = 0.3f; // Probability of making a random move during Monte Carlo simulation (only used if training)
 	private int[][] trainingAbstractions = new int[SIZE * 2][SIZE-1]; // Stores the 4 partial hand abstractions that occur during the game 
 																	  // for each of the 10 rows/cols (only used if training)
-
-	public boolean isTraining = false;
+	public boolean isTraining = false; // Set this to true when training
 
 	/**
-	 * Create a Random Monte Carlo player that simulates random play to depth 2.
+	 * Create a player.
 	 */
-	public HARGEMCPlayer() {}
-	
-	/**
-	 * Create a Random Monte Carlo player that simulates random play to a given depth limit.
-	 * @param depthLimit depth limit for random simulated play
-	 */
-	public HARGEMCPlayer(int depthLimit) {
-		this.depthLimit = depthLimit;
-	}
+	public bcf_HARD3GMCPlayer() {}
 	
 	/* (non-Javadoc)
 	 * @see PokerSquaresPlayer#init()
@@ -85,58 +80,22 @@ public class HARGEMCPlayer implements PokerSquaresPlayer {
 		 *   For each move, many simulated random plays to the set depthLimit are performed and the (sometimes
 		 *     partially-filled) grid is scored.
 		 *   For each play simulation, random undrawn cards are drawn in simulation and the player
-		 *     picks a play position randomly.
-		 *   After many such plays, the average score per simulated play is computed.  The play with the highest 
-		 *     average score is chosen (breaking ties randomly).   
+		 *     picks a play position to maximize utility increase (greedy play).
+		 *   After many such plays, the average score per simulated play is computed. The play with the highest 
+		 *     average score is chosen (breaking ties randomly).
 		 */
 		
 		// match simDeck to actual play event; in this way, all indices forward from the card contain a list of 
-		//   undealt Cards in some permutation.
+		// undealt Cards in some permutation.
 		int cardIndex = numPlays;
-		int remainingPlays = NUM_POS - numPlays;
 		while (!card.equals(simDeck[cardIndex]))
 			cardIndex++;
 		simDeck[cardIndex] = simDeck[numPlays];
 		simDeck[numPlays] = card;
 
-		if (remainingPlays == 1) {
-			// Do nothing to allow forced play
-		}
-		else if (remainingPlays <= EXPECTISIM_DEPTH) { // Last few turns will be calculated by expectimax.
-			float maxScore = 0;
-			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
-			ArrayList<Integer> bestPlays = new ArrayList<Integer>(); // all plays yielding the maximum average score
-
-			//System.out.println("DEBUG EXPECTIMAX----------------------------");
-			for (int i = 0; i < remainingPlays; i++) { // for each legal play position
-				// Try a play, simulate to the end of the game
-				int play = legalPlayLists[numPlays][i];
-				// System.out.printf("\nTrying play: (%d, %d) = %s\n", play/SIZE, play%SIZE, card);
-				makePlay(card, play / SIZE, play % SIZE);  // play the card at the empty position
-				float expectedScore = expectiSimPlay();
-				// System.out.printf("Expected score: %.1f\n", expectedScore);
-				// Use the expected score of the simulated play to rank the play
-				if (expectedScore >= maxScore) {
-					if (expectedScore > maxScore) {
-						bestPlays.clear();
-					}
-					bestPlays.add(play);
-					maxScore = expectedScore;
-				}
-				undoPlay();
-			}
-			// System.out.println("END DEBUG EXPECTIMAX------------------------");
-			int bestPlay = bestPlays.get(random.nextInt(bestPlays.size())); // choose a best play (breaking ties randomly)
-			// update our list of plays, recording the chosen play in its sequential position; all onward from numPlays are empty positions
-			int bestPlayIndex = numPlays;
-			while (plays[bestPlayIndex] != bestPlay) {
-				bestPlayIndex++;
-			}
-			plays[bestPlayIndex] = plays[numPlays];
-			plays[numPlays] = bestPlay;
-		}
-		else if (remainingPlays > EXPECTISIM_DEPTH) { // not the last few plays
+		if (numPlays < 24) { // not the forced last play
 			// compute average time per move evaluation
+			int remainingPlays = NUM_POS - numPlays; // ignores triviality of last play to keep a conservative margin for game completion
 			long millisPerPlay = millisRemaining / remainingPlays; // dividing time evenly with future getPlay() calls
 			long millisPerMoveEval = millisPerPlay / remainingPlays; // dividing time evenly across moves now considered
 			// copy the play positions (row-major indices) that are empty
@@ -194,8 +153,7 @@ public class HARGEMCPlayer implements PokerSquaresPlayer {
 			if (numCards > 0 && numCards < SIZE) {
 				trainingAbstractions[row][numCards-1] = getHandAbstraction(rowHand, true);
 			}
-			
-			// Col
+			// Column
 			numCards = 0;
 			for (Card c : colHand) {
 				if (c != null) numCards++;
@@ -238,16 +196,16 @@ public class HARGEMCPlayer implements PokerSquaresPlayer {
 	}
 
 	/**
-	 * From the chosen play, perform simulated Card draws and random placement (depthLimit) iterations forward 
+	 * From the chosen play, perform simulated Card draws and greedy placement (depthLimit) iterations forward 
 	 * and return the resulting grid score.
-	 * @param depthLimit - how many simulated random plays to perform
-	 * @return resulting grid score after random MC simulation to given depthLimit
+	 * @param depthLimit - how many simulated greedy plays to perform
+	 * @return resulting grid score after MC simulation to given depthLimit
 	 */
 	private float simPlay(int depthLimit) {
 		if (depthLimit == 0) { // with zero depth limit, return current score
 			return getGridUtility();
 		}
-		else { // up to the non-zero depth limit or to game end, iteratively make the given number of random plays
+		else { // up to the non-zero depth limit or to game end, iteratively make the given number of greedy plays
 			int depth = Math.min(depthLimit, NUM_POS - numPlays); // compute real depth limit, taking into account game end
 			for (int d = 0; d < depth; d++) {
 				// generate a random card draw
@@ -318,37 +276,6 @@ public class HARGEMCPlayer implements PokerSquaresPlayer {
 			return score;
 		}
 	}
-
-	/*
-	 * From the chosen play, attempt every possible game-end, evaluating them to
-	 * determine the expected score of the chosen play
-	 * @return resulting grid score after playing until end of game
-	*/
-	private float expectiSimPlay() {
-		// Base case: Expected value of a completed game is the score of the game
-		if (numPlays == NUM_POS) {
-			return system.getScore(grid);
-		}
-		int remainingPlays = NUM_POS - numPlays;
-
-		// Loop over the remaining cards in the deck, adding up their expected values
-		int sum = 0;
-		for (int i=numPlays; i<NUM_CARDS; i++) {
-			Card card = simDeck[i];
-
-			// Loop over the legal plays
-			System.arraycopy(plays, numPlays, legalPlayLists[numPlays], 0, remainingPlays);
-			for (int j=0; j<remainingPlays; j++) {
-				int play = legalPlayLists[numPlays][j];
-				makePlay(card, play / SIZE, play % SIZE);
-				// System.out.printf("%s: %.1f\n", card, expectiSimPlay());
-				sum += expectiSimPlay()/remainingPlays; // Returns the expected value of this card being played. Divide by remaining plays to scale the returned value by the number of moves that it's testing
-				undoPlay();
-			}
-		}
-		// Calculate expected score by averaging the expected score of all the possible cards that could be pulled
-		return ((float)sum)/(NUM_CARDS-numPlays);
-	}
 	
 	public void makePlay(Card card, int row, int col) {
 		// match simDeck to event
@@ -390,7 +317,7 @@ public class HARGEMCPlayer implements PokerSquaresPlayer {
 	 */
 	@Override
 	public String getName() {
-		return "HARGEMCPlayerDepth" + depthLimit;
+		return "bcf_HARD3GMCPlayer";
 	}
 
 	@SuppressWarnings("unchecked")
@@ -687,176 +614,21 @@ public class HARGEMCPlayer implements PokerSquaresPlayer {
 		return result;
 	}
 
-	// public void testHandAbstraction() {
-	// 	boolean isAuto = true;
-	// 	boolean hasFailure = false;
-
-	// 	// Manually create test hands
-	// 	System.out.println("=== MANUAL TESTS ===");
-	// 	int[][][][] testHands = {
-	// 		// Tests for: Num pairs & primary/secondary rank
-	// 		{{{0,0},{0,1},{0,2},{2,3}}, {{0b0010010101110000}}},
-	// 		{{{0,0},{0,1},{2,2},{2,3}}, {{0b0001000010100000}}},
-	// 		{{{0,0},{2,1},{2,2},{2,3}}, {{0b0010010101110000}}},
-	// 		{{{0,0},{1,1},{2,2},{2,3}}, {{0b0100100010000000}}},
-	// 		{{{0,0},{2,1},{1,2},{2,3}}, {{0b0100100110000000}}},
-	// 		{{{0,0},{2,1},{2,2},{1,3}}, {{0b0100100010000000}}},
-
-	// 		// Tests for: 3/4 of a kind
-	// 		{{{0,0},{0,1},{0,2},{0,3}}, {{0b0000001100000000}}},
-	// 		{{{1,0},{0,1},{0,2},{0,3}}, {{0b0010010001110000}}},
-	// 		{{{1,0},{0,1},{1,2},{1,3}}, {{0b0010010101110000}}},
-	// 		{{{1,0},{1,2},{1,3}}, {{0b0000010001000000}}},
-
-	// 		// Tests for: undealt straight
-	// 		{{{0,0}}, {{0b0010000111001010}}},
-	// 		{{{0,0},{1,1}}, {{0b0100000011111000}}},
-	// 		{{{0,0},{1,1},{2,2}}, {{0b0110000111001000}}},
-	// 		{{{0,0},{1,1},{2,2},{3,3}}, {{0b1000000011001000}}},
-	// 		{{{6,0},{1,1},{2,2},{3,3}}, {{0b1000000111000000}}},
-	// 		{{{6,0},{2,2},{3,3}}, {{0b0110000011001000}}},
-	// 		{{{6,0},{9,1}}, {{0b0100000111111000}}},
-	// 		{{{9,1}}, {{0b0010000011001010}}},
-	// 		{{{8,1}}, {{0b0010000111001010}}},
-	// 		{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1}}, {{0b1000000011001000}}},
-	// 		{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2}}, {{0b1000000111000100}}},
-	// 		{{{0,0},{1,1},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{4,3}}, {{0b1000000011000000}}},
-	// 		{{{6,0},{2,2},{3,3},{-1},{4,0},{4,1},{4,2},{5,0},{5,1},{5,2}}, {{0b0110000111000100}}},
-	// 		{{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1},{10,2}}, {{0b0100000011110100}}},
-	// 		{{{6,0},{9,1},{-1},{5,0},{5,1},{5,2},{7,0},{7,1},{7,2},{8,0},{8,1},{8,2},{10,0},{10,1}}, {{0b0100000111111000}}},
-
-	// 		// Tests for: undealt flush
-	// 		{{{0,0}}, {{0b0010000011001010}}},
-	// 		{{{0,0},{1,0}}, {{0b0100000111111010}}},
-	// 		{{{0,0},{1,0},{2,0}}, {{0b0110000011001010}}},
-	// 		{{{0,0},{1,0},{2,0},{3,0}}, {{0b1000000111001010}}},
-	// 		{{{0,0},{1,1}}, {{0b0100000011111000}}},
-	// 		{{{0,1},{1,0},{2,0}}, {{0b0110000111001000}}},
-	// 		{{{0,0},{1,0},{2,1},{3,0}}, {{0b1000000011001000}}},
-	// 		{{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0},{12,0}}, {{0b1000000111001000}}},
-	// 		{{{0,0},{1,0},{2,0},{3,0},{-1},{4,0},{5,0},{6,0},{7,0},{8,0},{9,0},{10,0},{11,0}}, {{0b1000000011001001}}},
-
-	// 	};
-	// 	for (int i = 0; i < testHands.length; i++) {
-	// 		boolean isRow = (i%2)==0;
-	// 		Card[] hand = new Card[5];
-	// 		Card[] removed = new Card[52];
-	// 		int numRemoved = 0;
-	// 		boolean handEnd = false;
-	// 		for (int j = 0; j<testHands[i][0].length; j++) {
-	// 			int[] testHand = testHands[i][0][j];
-	// 			if (testHand[0]==-1) {
-	// 				handEnd = true;
-	// 				continue;
-	// 			}
-	// 			Card card = new Card(testHand[0], testHand[1]);
-	// 			makePlay(card, 0, 0);
-	// 			if (!handEnd) hand[j] = card;
-	// 			else removed[numRemoved++] = card;
-	// 		}
-	// 		// Test
-	// 		if (isAuto) {
-	// 			int expected = testHands[i][1][0][0];
-	// 			int result = getHandAbstraction(hand, isRow);
-	// 			if (result != expected) {
-	// 				System.out.println("Test case failed: ["+i+"]");
-	// 				hasFailure = true;
-	// 			}
-	// 		}
-	// 		else {
-	// 			System.out.print("Hand: ");
-	// 			for (Card card : hand) {
-	// 				if (card!=null) System.out.print(card+" ");
-	// 			}
-	// 			if (numRemoved > 0) {
-	// 				System.out.print("minus [");
-	// 				for (int j=0; j<numRemoved; j++) {
-	// 					System.out.print(removed[j]+" ");
-	// 				}
-	// 				System.out.print("]");
-	// 			}
-	// 			System.out.println();
-	// 			int abstraction = getHandAbstraction(hand, isRow);
-	// 			// Print abstraction
-	// 			String abstractionStr = abstractionToString(abstraction);
-	// 			String abstractionBinStr = Integer.toBinaryString(abstraction);
-	// 			String abstractionBinStrPad = ("0000000000000000" + abstractionBinStr).substring(abstractionBinStr.length());
-	// 			System.out.println("Abstraction: "+abstractionStr+" ("+abstractionBinStrPad+")");
-	// 		}
-	// 		// Reset after each hand
-	// 		init();
-	// 	}
-
-	// 	if (isAuto && !hasFailure) {
-	// 		System.out.println("All manual tests passed.");
-	// 	}
-
-	// 	System.out.print("...");
-	// 	Scanner sc = new Scanner(System.in);
-	// 	sc.nextLine();
-	// 	sc.close();
-
-	// 	System.out.println("=== RANDOM TESTS ===");
-	// 	// Generate 10 random hands from 1 deck
-	// 	for (int i=0; i<5; i++) {
-	// 		Card[] hand = new Card[5];
-	// 		int numCards = random.nextInt(4)+1;
-	// 		for (int j=0; j<4; j++) {
-	// 			if (j>=numCards) {
-	// 				hand[j] = null;
-	// 			}
-	// 			else {
-	// 				int cardIndex = random.nextInt(NUM_CARDS - numPlays) + numPlays;
-	// 				hand[j] = simDeck[cardIndex];
-	// 				makePlay(hand[j], 0, 0);
-	// 			}
-	// 		}
-	// 		System.out.print("Hand: ");
-	// 		for (Card card : hand) {
-	// 			if (card!=null) System.out.print(card+" ");
-	// 		}
-	// 		System.out.println();
-	// 		boolean isRow = (i%2)==0;
-	// 		int abstraction = getHandAbstraction(hand, isRow);
-	// 		// Print abstraction
-	// 		String abstractionStr = abstractionToString(abstraction);
-	// 		String abstractionBinStr = Integer.toBinaryString(abstraction);
-	// 		String abstractionBinStrPad = ("0000000000000000" + abstractionBinStr).substring(abstractionBinStr.length());
-	// 		System.out.println("Abstraction: "+abstractionStr+" ("+abstractionBinStrPad+")");
-	// 	}
-	// }
-
-	public static void train(int depth, int iterations) {
+	public static void train(int iterations) {
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		HARGEMCPlayer player = new HARGEMCPlayer(depth);
+		bcf_HARD3GMCPlayer player = new bcf_HARD3GMCPlayer();
 		player.isTraining = true;
 		PokerSquares ps = new PokerSquares(player, system);
-		// ps.setVerbose(false);
-
-		// delta is the exponential decay factor for epsilon (calculated so epsilon reaches 0.1 after all iterations)
-		double delta = Math.exp(Math.log(0.1f/player.epsilon)/iterations);
-		if (delta > 1) throw new RuntimeException("ERROR: delta>1 ("+delta+")");
-
-		for (int i=0; i<iterations; i++) {
-			int score = ps.play();
-			System.out.println(score);
-			player.epsilon *= delta; // decay epsilon after each iteration
-		}
-		System.out.println("Done! Completed "+iterations+" iterations. (final epsilon: "+player.epsilon+")");
+		ps.playSequence(iterations,  0, false);
+		System.out.println("Done! Completed "+iterations+" iterations.");
 	}
 
 	public static void main(String[] args) {
-		// === Test hand abstrations ===
-		// HARGEMCPlayer player = new HARGEMCPlayer(25);
-		// player.isTraining = true;
-		// player.init();
-		// player.testHandAbstraction();
-
-		// Play a single game
+		// Play 20 games
 		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
 		System.out.println(system);
-		new PokerSquares(new HARGEMCPlayer(25), system).play(); // play a single game
+		PokerSquares ps = new PokerSquares(new bcf_HARD3GMCPlayer(), system);
+		ps.playSequence(20, 0, true);
 	}
-
 }

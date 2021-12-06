@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
+import java.util.Scanner;
 import java.util.Stack;
 
 /* A version of the solitaire game "Poker Squares" with variable point systems.
@@ -236,9 +237,6 @@ public class PokerSquares {
 		random.setSeed(seed);
 	}
 
-	public void setVerbose(boolean verbose) {
-		this.verbose = verbose;
-	}
 
 	/**
 	 * Demonstrate single/batch game play testing and tournament evaluation of PokerSquaresPlayers.
@@ -247,30 +245,34 @@ public class PokerSquares {
 	public static void main(String[] args) {
 
 		// Demonstration of single game play (30 seconds)
-		// System.out.println("Single game demo:");
-		// PokerSquaresPointSystem.setSeed(0L);
-		// PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
-		// System.out.println(system);
-		// new PokerSquares(new RandomPlayer(), system).play();
+//		System.out.println("Single game demo:");
+//		PokerSquaresPointSystem.setSeed(0L);
+//		PokerSquaresPointSystem system = PokerSquaresPointSystem.getBritishPointSystem();
+//		System.out.println(system);
+//		new PokerSquares(new RandomPlayer(), system).play();
+
+
 
 		// Demonstration of batch game play (30 seconds per game)
-		// System.out.println("\n\nBatch game demo:");
-		// System.out.println(system);
-		// new PokerSquares(new RandomPlayer(), system).playSequence(3, 0, true);
-
-		// Demonstration of tournament evaluation (2 players, 3 point systems, 10 x 30s games for each of the 2*3=6 player-system pairs)
-		System.out.println("\n\nTournament evaluation demo:");
-
-		ArrayList<PokerSquaresPlayer> players = new ArrayList<PokerSquaresPlayer>();
-		players.add(new RandomPlayer());
-
-		ArrayList<PokerSquaresPointSystem> systems = new ArrayList<PokerSquaresPointSystem>();
-		PokerSquaresPointSystem.setSeed(42L);
-		systems.add(PokerSquaresPointSystem.getBritishPointSystem());
-		systems.add(PokerSquaresPointSystem.getAmericanPointSystem());
-		systems.add(PokerSquaresPointSystem.getSingleHandPointSystem(PokerHand.FLUSH.id));  // 1 point for flushes, 0 for all other hands
+//		System.out.println("\n\nBatch game demo:");
+//		System.out.println(system);
+//		new PokerSquares(new RandomPlayer(), system).playSequence(3, 0, true);
 
 
-		PokerSquares.playTournament(players, systems, 20, 0L);  // play 20 games for each player under each scoring system
+
+                // Demonstration of tournament evaluation (2 players, 3 point systems, 10 x 30s games for each of the 2*3=6 player-system pairs)
+                System.out.println("\n\nTournament evaluation demo:");
+
+                ArrayList<PokerSquaresPlayer> players = new ArrayList<PokerSquaresPlayer>();
+                players.add(new RandomPlayer());
+
+                ArrayList<PokerSquaresPointSystem> systems = new ArrayList<PokerSquaresPointSystem>();
+                PokerSquaresPointSystem.setSeed(42L);
+                systems.add(PokerSquaresPointSystem.getBritishPointSystem());
+                systems.add(PokerSquaresPointSystem.getAmericanPointSystem());
+                systems.add(PokerSquaresPointSystem.getSingleHandPointSystem(PokerHand.FLUSH.id));  // 1 point for flushes, 0 for all other hands
+
+
+                PokerSquares.playTournament(players, systems, 20, 0L);  // play 20 games for each player under each scoring system
 	}
 }
